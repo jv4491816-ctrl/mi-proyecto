@@ -1,22 +1,39 @@
-# Guitarra Fácil 🎸
+🎸 Guitarra Fácil
+📌 Descripción
 
-Una plataforma moderna e interactiva para aprender guitarra desde cero.
+Guitarra Fácil es una plataforma web educativa para aprender guitarra de forma interactiva. Integra herramientas como afinador por micrófono, metrónomo, partituras y lecciones por niveles, con seguimiento del progreso del estudiante.
 
-## 🚀 Características
+🎯 Objetivo
 
-- **Afinador Profesional**: Afina tu guitarra con precisión usando el micrófono
-- **Metrónomo Inteligente**: Mantén el ritmo perfecto mientras practicas
-- **Sistema de Aprendizaje**: Lecciones estructuradas con seguimiento de progreso
-- **Biblioteca de Partituras**: Canciones para todos los niveles
-- **Panel de Administración**: Gestiona usuarios y contenido
-- **Autenticación**: Sistema de login/registro para estudiantes y administradores
+Desarrollar una plataforma web que facilite el aprendizaje de guitarra mediante recursos digitales, permitiendo practicar, aprender y medir el avance del usuario.
 
-## 🛠️ Tecnologías Utilizadas
+🧩 Funcionalidades Principales
 
-- **HTML5**: Estructura semántica y moderna
-- **CSS3**: Variables CSS, Flexbox, Grid, animaciones
-- **JavaScript Vanilla**: Web Audio API, localStorage, navegación SPA
-- **Font Awesome**: Iconografía moderna
-- **Google Fonts**: Tipografía Inter
+🎵 Afinador por micrófono en tiempo real.
 
-## 📁 Estructura del Proyecto
+⏱️ Metrónomo con control de BPM y señal visual.
+
+📄 Biblioteca de partituras con buscador.
+
+📘 Lecciones por niveles con progreso guardado.
+
+📊 Seguimiento del progreso del usuario.
+
+⚙️ Tecnologías
+
+HTML, CSS y JavaScript
+
+Web Audio API y MediaDevices API
+
+
+🎨 Diseño
+
+Diseño moderno y responsivo (mobile-first).
+
+Uso de CSS Grid y Flexbox.
+
+Interfaz clara y fácil de usar.
+
+✅ Estado del Proyecto
+
+📌 Proyecto académico funcional, sin backend real (datos simulados).
