@@ -51,7 +51,7 @@ menuToggle.addEventListener('click', function() {
 const initialPage = window.location.hash.substring(1) || 'index';
 showPage(initialPage);
 
-// ========== SISTEMA DE AUTENTICACIÓN MEJORADO ==========
+// ========== SISTEMA DE AUTENTICACIÓN FIREBASE v10 MODULAR ==========
 const loginModal = document.getElementById('loginModal');
 const modalFormSection = document.getElementById('modalFormSection');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
@@ -67,6 +67,128 @@ const userRole = document.getElementById('user-role');
 
 let currentFormType = 'login';
 let currentUser = null;
+let firebaseAvailable = false;
+let auth = null;
+let firebaseModules = null;
+
+// Verificar si Firebase Modular está disponible
+function checkFirebaseAvailability() {
+    console.log("🔍 Verificando Firebase Modular v10...");
+    
+    if (!window.firebaseReady) {
+        console.log("❌ Firebase NO está listo (window.firebaseReady = false)");
+        return false;
+    }
+    
+    if (!window.firebaseAuth) {
+        console.log("❌ Firebase Auth NO está disponible");
+        return false;
+    }
+    
+    if (!window.firebaseModules) {
+        console.log("❌ Firebase Modules NO están disponibles");
+        return false;
+    }
+    
+    console.log("✅ Firebase Modular v10 está completamente disponible");
+    return true;
+}
+
+// Inicializar Firebase Modular
+function initializeFirebase() {
+    try {
+        console.log("🎯 Inicializando Firebase Modular v10...");
+        
+        // Verificar disponibilidad
+        firebaseAvailable = checkFirebaseAvailability();
+        
+        if (!firebaseAvailable) {
+            console.warn("⚠️ Firebase Modular NO disponible. Usando modo local.");
+            
+            // Esperar un momento por si Firebase se carga después
+            setTimeout(() => {
+                firebaseAvailable = checkFirebaseAvailability();
+                if (firebaseAvailable) {
+                    setupAuthObserver();
+                } else {
+                    loadUserFromStorage();
+                }
+            }, 1000);
+            
+            loadUserFromStorage();
+            return;
+        }
+        
+        // Asignar módulos de Firebase
+        auth = window.firebaseAuth;
+        firebaseModules = window.firebaseModules;
+        
+        console.log("✅ Firebase Modular disponible, configurando observador...");
+        setupAuthObserver();
+        
+    } catch (error) {
+        console.error("❌ Error inicializando Firebase Modular:", error);
+        firebaseAvailable = false;
+        loadUserFromStorage();
+    }
+}
+
+// Configurar observador de autenticación
+function setupAuthObserver() {
+    try {
+        console.log("👁️ Configurando observador de autenticación...");
+        
+        firebaseModules.onAuthStateChanged(auth, (user) => {
+            console.log("🔄 Cambio en estado de autenticación:", user ? `Usuario: ${user.email}` : "Sin usuario");
+            
+            if (user) {
+                handleFirebaseUser(user);
+            } else {
+                currentUser = null;
+                localStorage.removeItem('guitarraFacilUser');
+                updateUIForUser(null);
+            }
+        });
+        
+        console.log("✅ Observador de autenticación configurado");
+        
+    } catch (error) {
+        console.error("❌ Error configurando observador:", error);
+        firebaseAvailable = false;
+    }
+}
+
+// Manejar usuario de Firebase Modular
+function handleFirebaseUser(user) {
+    console.log("👤 Procesando usuario de Firebase Modular:", user.email);
+    
+    // Determinar rol
+    const isAdmin = user.email.includes('admin') || user.email === 'admin@demo.com';
+    
+    currentUser = {
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName || user.email.split('@')[0],
+        role: isAdmin ? 'admin' : 'student',
+        isFirebaseUser: true,
+        emailVerified: user.emailVerified,
+        photoURL: user.photoURL
+    };
+    
+    // Formatear nombre
+    if (!user.displayName && user.email) {
+        const nameFromEmail = user.email.split('@')[0];
+        currentUser.name = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
+    }
+    
+    // Guardar en localStorage
+    localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+    
+    // Actualizar UI
+    updateUIForUser(currentUser);
+    
+    console.log("✅ Usuario procesado:", currentUser.name, "Rol:", currentUser.role);
+}
 
 // Cargar usuario desde localStorage
 function loadUserFromStorage() {
@@ -74,6 +196,7 @@ function loadUserFromStorage() {
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
         updateUIForUser(currentUser);
+        console.log("📂 Usuario cargado desde localStorage:", currentUser.email);
     }
 }
 
@@ -84,6 +207,7 @@ function updateUIForUser(user) {
         userInfo.style.display = 'flex';
         userName.textContent = user.name;
         userRole.textContent = user.role === 'admin' ? 'Administrador' : 'Estudiante';
+        userRole.className = 'role-badge ' + (user.role === 'admin' ? 'role-admin' : 'role-student');
         
         // Mostrar contenido específico
         const studentElements = document.querySelectorAll('.student-only');
@@ -92,16 +216,41 @@ function updateUIForUser(user) {
         if (user.role === 'admin') {
             studentElements.forEach(el => el.style.display = 'none');
             adminElements.forEach(el => el.style.display = 'block');
-            document.getElementById('admin-welcome-name').textContent = user.name;
+            if (document.getElementById('admin-welcome-name')) {
+                document.getElementById('admin-welcome-name').textContent = user.name;
+            }
         } else {
             studentElements.forEach(el => el.style.display = 'block');
             adminElements.forEach(el => el.style.display = 'none');
-            document.getElementById('student-welcome-name').textContent = user.name;
+            if (document.getElementById('student-welcome-name')) {
+                document.getElementById('student-welcome-name').textContent = user.name;
+            }
+        }
+        
+        // Actualizar estadísticas del estudiante
+        if (user.role === 'student') {
+            updateStudentStats();
         }
     } else {
         authButtons.style.display = 'flex';
         userInfo.style.display = 'none';
         document.querySelectorAll('.student-only, .admin-only').forEach(el => el.style.display = 'none');
+    }
+}
+
+// Actualizar estadísticas del estudiante
+function updateStudentStats() {
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
+    const progress = userData.progress || { level: 1, percentage: 0, lessons: 0 };
+    
+    if (document.getElementById('student-level')) {
+        document.getElementById('student-level').textContent = progress.level;
+    }
+    if (document.getElementById('student-progress')) {
+        document.getElementById('student-progress').textContent = `${progress.percentage}%`;
+    }
+    if (document.getElementById('student-lessons')) {
+        document.getElementById('student-lessons').textContent = progress.lessons;
     }
 }
 
@@ -118,12 +267,12 @@ function loadForm(formType) {
             
             <form id="modalLoginForm">
                 <div class="modal-form-group">
-                    <label for="modalUsername">Email o Usuario</label>
-                    <div class="modal-input-with-icon" id="modalUsernameContainer">
-                        <i class="fas fa-user"></i>
-                        <input type="text" id="modalUsername" placeholder="Ingresa tu email o usuario" required>
+                    <label for="modalEmail">Email</label>
+                    <div class="modal-input-with-icon" id="modalEmailContainer">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="modalEmail" placeholder="Ingresa tu email" required>
                     </div>
-                    <span class="error-message" id="modalUsernameError"></span>
+                    <span class="error-message" id="modalEmailError"></span>
                 </div>
                 
                 <div class="modal-form-group">
@@ -131,7 +280,7 @@ function loadForm(formType) {
                     <div class="modal-input-with-icon" id="modalPasswordContainer">
                         <i class="fas fa-lock"></i>
                         <input type="password" id="modalPassword" placeholder="Ingresa tu contraseña" required>
-                        <button type="button" id="togglePasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-color); cursor: pointer;">
+                        <button type="button" id="togglePasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
@@ -158,9 +307,6 @@ function loadForm(formType) {
                 </div>
                 <div class="modal-social-btn facebook">
                     <i class="fab fa-facebook-f"></i>
-                </div>
-                <div class="modal-social-btn apple">
-                    <i class="fab fa-apple"></i>
                 </div>
             </div>
             
@@ -198,8 +344,8 @@ function loadForm(formType) {
                     <label for="modalSignupPassword">Contraseña</label>
                     <div class="modal-input-with-icon" id="modalSignupPasswordContainer">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="modalSignupPassword" placeholder="Crea una contraseña segura" required>
-                        <button type="button" id="toggleSignupPasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-color); cursor: pointer;">
+                        <input type="password" id="modalSignupPassword" placeholder="Crea una contraseña segura (mínimo 6 caracteres)" required>
+                        <button type="button" id="toggleSignupPasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
@@ -223,9 +369,6 @@ function loadForm(formType) {
                 <div class="modal-social-btn facebook">
                     <i class="fab fa-facebook-f"></i>
                 </div>
-                <div class="modal-social-btn apple">
-                    <i class="fab fa-apple"></i>
-                </div>
             </div>
             
             <div class="modal-signup-link">
@@ -234,7 +377,6 @@ function loadForm(formType) {
         `;
     }
     
-    // Configurar eventos para el formulario cargado
     setupFormEvents();
 }
 
@@ -242,174 +384,338 @@ function loadForm(formType) {
 function setupFormEvents() {
     if (currentFormType === 'login') {
         const loginForm = document.getElementById('modalLoginForm');
-        const usernameInput = document.getElementById('modalUsername');
         const passwordInput = document.getElementById('modalPassword');
         const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-        const submitBtn = document.getElementById('modalSubmitBtn');
         const switchToSignup = document.getElementById('modalSwitchToSignup');
         const forgotPassword = document.getElementById('modalForgotPassword');
         
         // Toggle password visibility
-        togglePasswordBtn?.addEventListener('click', function() {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-        });
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
+        }
         
         // Switch to signup
-        switchToSignup?.addEventListener('click', function(e) {
-            e.preventDefault();
-            loadForm('signup');
-        });
+        if (switchToSignup) {
+            switchToSignup.addEventListener('click', function(e) {
+                e.preventDefault();
+                currentFormType = 'signup';
+                loadForm('signup');
+            });
+        }
         
         // Forgot password
-        forgotPassword?.addEventListener('click', function(e) {
-            e.preventDefault();
-            handleForgotPassword();
-        });
+        if (forgotPassword) {
+            forgotPassword.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleForgotPassword();
+            });
+        }
         
         // Login form submission
-        loginForm?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            handleLogin();
-        });
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleLogin();
+            });
+        }
     } else {
         const signupForm = document.getElementById('modalSignupForm');
         const passwordInput = document.getElementById('modalSignupPassword');
         const togglePasswordBtn = document.getElementById('toggleSignupPasswordBtn');
-        const submitBtn = document.getElementById('modalSignupSubmitBtn');
         const switchToLogin = document.getElementById('modalSwitchToLogin');
         
         // Toggle password visibility
-        togglePasswordBtn?.addEventListener('click', function() {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-        });
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
+        }
         
         // Switch to login
-        switchToLogin?.addEventListener('click', function(e) {
-            e.preventDefault();
-            loadForm('login');
-        });
+        if (switchToLogin) {
+            switchToLogin.addEventListener('click', function(e) {
+                e.preventDefault();
+                currentFormType = 'login';
+                loadForm('login');
+            });
+        }
         
         // Signup form submission
-        signupForm?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            handleSignup();
-        });
+        if (signupForm) {
+            signupForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleSignup();
+            });
+        }
     }
 }
 
-// Manejar login
+// Manejar login con Firebase Modular
 async function handleLogin() {
-    const username = document.getElementById('modalUsername')?.value.trim();
+    const email = document.getElementById('modalEmail')?.value.trim();
     const password = document.getElementById('modalPassword')?.value;
     const submitBtn = document.getElementById('modalSubmitBtn');
     
-    // Simular proceso de login
+    // Validaciones básicas
+    if (!email || !password) {
+        alert('Por favor, completa todos los campos');
+        return;
+    }
+    
+    // Actualizar UI del botón
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin loading-spinner"></i> Iniciando sesión...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
     
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Credenciales de demostración
-    const demoCredentials = [
-        { username: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
-        { username: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
-        { username: 'usuario', password: '123456', name: 'Usuario Regular', role: 'student' }
-    ];
-    
-    const user = demoCredentials.find(
-        cred => (cred.username === username || cred.name.toLowerCase().includes(username.toLowerCase())) && 
-               cred.password === password
-    );
-    
-    if (user) {
-        // Login exitoso
-        currentUser = user;
-        localStorage.setItem('guitarraFacilUser', JSON.stringify(user));
-        updateUIForUser(user);
+    try {
+        console.log("🔑 Intentando login... Firebase disponible:", firebaseAvailable);
         
-        submitBtn.classList.remove('error-btn');
-        submitBtn.classList.add('success-btn');
-        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+        // PRIMERO intentar con Firebase Modular si está disponible
+        if (firebaseAvailable && checkFirebaseAvailability()) {
+            console.log("✅ Usando Firebase Modular para login...");
+            
+            const userCredential = await firebaseModules.signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            console.log("✅ Login exitoso con Firebase Modular:", user.email);
+            
+            // Éxito con Firebase
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
+            
+            setTimeout(() => {
+                closeModal();
+            }, 1000);
+            return;
+        }
         
-        setTimeout(() => {
-            closeModal();
-            alert(`¡Bienvenido de nuevo, ${user.name}!`);
-        }, 500);
-    } else {
-        // Credenciales incorrectas
-        submitBtn.classList.remove('success-btn');
-        submitBtn.classList.add('error-btn');
+        // SI NO, usar login local (usuarios demo)
+        console.log("⚠️ Firebase Modular no disponible, usando login local...");
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Credenciales de demostración CORREGIDAS
+        const demoCredentials = [
+            { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
+            { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
+            { email: 'usuario@demo.com', password: '123456', name: 'Usuario Regular', role: 'student' }
+        ];
+        
+        const user = demoCredentials.find(
+            cred => cred.email === email && cred.password === password
+        );
+        
+        if (user) {
+            // Login exitoso con usuario demo
+            currentUser = user;
+            localStorage.setItem('guitarraFacilUser', JSON.stringify(user));
+            updateUIForUser(user);
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
+            
+            setTimeout(() => {
+                closeModal();
+                console.log('✅ Login exitoso con usuario demo:', user.email);
+            }, 1000);
+        } else {
+            // Credenciales incorrectas
+            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+            submitBtn.classList.add('error-btn');
+            
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>INICIAR SESIÓN</span><i class="fas fa-arrow-right"></i>';
+                submitBtn.classList.remove('error-btn');
+                alert('Email o contraseña incorrectos.\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• usuario@demo.com / 123456');
+            }, 1000);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en login:', error);
+        
         submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
+        
+        let errorMessage = 'Error al iniciar sesión';
+        
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            errorMessage = 'Email o contraseña incorrectos';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = 'Demasiados intentos. Intenta más tarde.';
+        }
         
         setTimeout(() => {
             submitBtn.disabled = false;
-            submitBtn.classList.remove('error-btn');
             submitBtn.innerHTML = '<span>INICIAR SESIÓN</span><i class="fas fa-arrow-right"></i>';
-            alert('Credenciales incorrectas. Por favor, inténtalo de nuevo.');
-        }, 500);
+            submitBtn.classList.remove('error-btn');
+            alert(errorMessage);
+        }, 1000);
     }
 }
 
-// Manejar registro
+// Manejar registro con Firebase Modular
 async function handleSignup() {
-    const name = document.getElementById('modalSignupName').value.trim();
-    const email = document.getElementById('modalSignupEmail').value.trim();
-    const password = document.getElementById('modalSignupPassword').value;
+    const name = document.getElementById('modalSignupName')?.value.trim();
+    const email = document.getElementById('modalSignupEmail')?.value.trim();
+    const password = document.getElementById('modalSignupPassword')?.value;
     const submitBtn = document.getElementById('modalSignupSubmitBtn');
     
-    // Simular proceso de registro
+    console.log("📝 === DEBUG REGISTRO FIREBASE MODULAR ===");
+    console.log("Email:", email);
+    console.log("Firebase disponible:", firebaseAvailable);
+    console.log("checkFirebaseAvailability:", checkFirebaseAvailability());
+    console.log("auth disponible:", !!auth);
+    console.log("firebaseModules:", !!firebaseModules);
+    console.log("==========================");
+    
+    // Validaciones básicas
+    if (!name || !email || !password) {
+        alert('Por favor, completa todos los campos');
+        return;
+    }
+    
+    if (password.length < 6) {
+        alert('La contraseña debe tener al menos 6 caracteres');
+        return;
+    }
+    
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin loading-spinner"></i> Creando cuenta...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
     
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Registrar nuevo usuario
-    currentUser = {
-        name: name,
-        email: email,
-        role: 'student',
-        createdAt: new Date().toISOString()
-    };
-    
-    localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
-    updateUIForUser(currentUser);
-    
-    submitBtn.classList.remove('error-btn');
-    submitBtn.classList.add('success-btn');
-    submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
-    
-    setTimeout(() => {
-        closeModal();
-        alert(`¡Bienvenido a Guitarra Fácil, ${name}! Tu cuenta ha sido creada exitosamente.`);
-    }, 500);
-}
-
-// Manejar "Olvidé mi contraseña"
-function handleForgotPassword() {
-    const email = prompt('Por favor, ingresa tu email para recuperar tu contraseña:');
-    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert(`Se ha enviado un enlace de recuperación a: ${email}\n\n(Esta es una demostración. En una aplicación real se enviaría un email real.)`);
-    } else if (email) {
-        alert('Por favor, ingresa un email válido.');
+    try {
+        // PRIMERO intentar con Firebase Modular si está disponible
+        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
+            console.log("🔥 Creando usuario en Firebase Modular...");
+            
+            const userCredential = await firebaseModules.createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            console.log("✅ Usuario creado en Firebase Modular:", user.uid);
+            console.log("📧 Email:", user.email);
+            
+            // Actualizar nombre en perfil
+            await firebaseModules.updateProfile(user, { displayName: name });
+            
+            // Enviar email de verificación
+            await firebaseModules.sendEmailVerification(user);
+            console.log("📧 Email de verificación enviado");
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
+            submitBtn.classList.add('success-btn');
+            
+            setTimeout(() => {
+                closeModal();
+                alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en Firebase.\n\nHemos enviado un email de verificación a:\n${email}\n\nPor favor verifica tu email.`);
+            }, 1500);
+            
+            return;
+        }
+        
+        // SI NO, usar registro local
+        console.log("⚠️ Firebase Modular no disponible, usando registro local...");
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        currentUser = {
+            name: name,
+            email: email,
+            role: 'student',
+            progress: { level: 1, percentage: 0, lessons: 0 },
+            createdAt: new Date().toISOString(),
+            isLocalUser: true
+        };
+        
+        localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+        updateUIForUser(currentUser);
+        
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
+        submitBtn.classList.add('success-btn');
+        
+        setTimeout(() => {
+            closeModal();
+            alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en modo local.\n\nEmail: ${email}\nContraseña: ${password}`);
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error en registro:', error);
+        
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
+        
+        let errorMessage = 'Error al crear la cuenta';
+        
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'Este email ya está registrado';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Email inválido';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'Contraseña muy débil (mínimo 6 caracteres)';
+        }
+        
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>CREAR CUENTA</span><i class="fas fa-user-plus"></i>';
+            submitBtn.classList.remove('error-btn');
+            alert(errorMessage + '\n\nCódigo de error: ' + error.code);
+        }, 1000);
     }
 }
 
-// Manejar logout
-function handleLogout() {
-    currentUser = null;
-    localStorage.removeItem('guitarraFacilUser');
-    updateUIForUser(null);
-    alert('Sesión cerrada exitosamente.');
+// Manejar "Olvidé mi contraseña" con Firebase Modular
+async function handleForgotPassword() {
+    const email = prompt('Por favor, ingresa tu email para recuperar tu contraseña:');
+    
+    if (!email) return;
+    
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Por favor, ingresa un email válido.');
+        return;
+    }
+    
+    try {
+        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
+            await firebaseModules.sendPasswordResetEmail(auth, email);
+            alert(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`);
+        } else {
+            alert(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}`);
+        }
+    } catch (error) {
+        console.error('Error al enviar email de recuperación:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Manejar logout con Firebase Modular
+async function handleLogout() {
+    try {
+        // Cerrar sesión en Firebase Modular si está disponible
+        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
+            await firebaseModules.signOut(auth);
+            console.log("✅ Sesión cerrada en Firebase Modular");
+        }
+        
+        // Limpiar datos locales
+        currentUser = null;
+        localStorage.removeItem('guitarraFacilUser');
+        updateUIForUser(null);
+        
+        alert('Sesión cerrada exitosamente. ¡Hasta pronto! 🎸');
+        
+    } catch (error) {
+        console.error('Error al cerrar sesión:', error);
+        alert('Error al cerrar sesión: ' + error.message);
+    }
 }
 
 // Abrir modal
 function openModal(formType = 'login') {
+    currentFormType = formType;
     loadForm(formType);
     loginModal.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -422,24 +728,63 @@ function closeModal() {
 }
 
 // Event Listeners
-studentLoginBtn?.addEventListener('click', () => openModal('login'));
-adminLoginBtn?.addEventListener('click', () => openModal('login'));
-modalCloseBtn?.addEventListener('click', closeModal);
-modalSignupBtn?.addEventListener('click', () => openModal('signup'));
-modalLoginBtn?.addEventListener('click', () => openModal('login'));
-logoutBtn?.addEventListener('click', handleLogout);
+if (studentLoginBtn) {
+    studentLoginBtn.addEventListener('click', () => openModal('login'));
+}
+if (adminLoginBtn) {
+    adminLoginBtn.addEventListener('click', () => openModal('login'));
+}
+if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', closeModal);
+}
+if (modalSignupBtn) {
+    modalSignupBtn.addEventListener('click', () => openModal('signup'));
+}
+if (modalLoginBtn) {
+    modalLoginBtn.addEventListener('click', () => openModal('login'));
+}
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleLogout);
+}
 
 // Cerrar modal al hacer clic fuera
-loginModal?.addEventListener('click', function(e) {
-    if (e.target === loginModal) {
-        closeModal();
+if (loginModal) {
+    loginModal.addEventListener('click', function(e) {
+        if (e.target === loginModal) {
+            closeModal();
+        }
+    });
+}
+
+// Inicializar Firebase Modular cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM cargado, inicializando aplicación Firebase Modular...');
+    
+    // Esperar un momento para asegurar que Firebase se cargó
+    setTimeout(() => {
+        initializeFirebase();
+    }, 500);
+    
+    // Efecto de escritura en el hero
+    const heroText = document.querySelector('.hero h1');
+    if (heroText) {
+        const originalText = heroText.textContent;
+        heroText.textContent = '';
+        let i = 0;
+        
+        function typeWriter() {
+            if (i < originalText.length) {
+                heroText.textContent += originalText.charAt(i);
+                i++;
+                setTimeout(typeWriter, 50);
+            }
+        }
+        
+        setTimeout(typeWriter, 500);
     }
 });
 
-// Cargar usuario al iniciar
-loadUserFromStorage();
-
-// ========== AFINADOR MEJORADO ==========
+// ========== AFINADOR MEJORADO (MISMO CÓDIGO) ==========
 // Configuración de cuerdas
 const STRINGS = {
     'mi-high': {
@@ -515,12 +860,15 @@ function initAfinador() {
     
     setupEventListenersAfinador();
     updateStringDisplayAfinador();
+    console.log('🎸 Afinador inicializado');
 }
 
 // Configurar event listeners del afinador
 function setupEventListenersAfinador() {
     // Botón de micrófono
-    elementsAfinador.micToggle?.addEventListener('click', toggleMicrophoneAfinador);
+    if (elementsAfinador.micToggle) {
+        elementsAfinador.micToggle.addEventListener('click', toggleMicrophoneAfinador);
+    }
     
     // Botones de selección de cuerda
     document.querySelectorAll('.string-btn').forEach(btn => {
@@ -546,6 +894,8 @@ function selectStringAfinador(stringType) {
     // Actualizar display
     updateStringDisplayAfinador();
     resetDisplayAfinador();
+    
+    console.log(`🎸 Cuerda seleccionada: ${STRINGS[stringType].name}`);
 }
 
 // Actualizar display según la cuerda seleccionada
@@ -615,8 +965,11 @@ async function startListeningAfinador() {
         
         analyzeAudioAfinador();
         
+        console.log('🎤 Micrófono activado para afinador');
+        
     } catch (error) {
         console.error('Error en configuración de audio:', error);
+        alert('Error al acceder al micrófono. Asegúrate de que tu micrófono esté conectado y tengas permisos para usarlo.');
         throw error;
     }
 }
@@ -654,6 +1007,7 @@ function stopListeningAfinador() {
     }
     
     resetDisplayAfinador();
+    console.log('🎤 Micrófono desactivado');
 }
 
 // Resetear display del afinador
@@ -712,7 +1066,6 @@ function analyzeAudioAfinador() {
     state.analyser.getFloatTimeDomainData(dataArray);
     
     // Detectar frecuencia (simplificado para demostración)
-    // En una implementación real usarías un algoritmo como autocorrelación o FFT
     const detection = detectFrequency(dataArray, state.audioContext.sampleRate);
     
     if (detection.valid) {
@@ -731,9 +1084,6 @@ function analyzeAudioAfinador() {
 
 // Función simplificada de detección de frecuencia
 function detectFrequency(dataArray, sampleRate) {
-    // Esta es una versión simplificada para demostración
-    // En producción, usarías un algoritmo de detección de pitch real
-    
     // Calcular energía de la señal
     let energy = 0;
     for (let i = 0; i < dataArray.length; i++) {
@@ -747,7 +1097,7 @@ function detectFrequency(dataArray, sampleRate) {
     
     // Para demostración: generar una frecuencia aleatoria cerca del objetivo
     const string = STRINGS[state.currentString];
-    const randomOffset = (Math.random() - 0.5) * 20; // ±10 Hz
+    const randomOffset = (Math.random() - 0.5) * 20;
     const simulatedFrequency = string.frequency + randomOffset;
     const simulatedStrength = Math.min(energy * 10, 1);
     
@@ -813,7 +1163,7 @@ function updateDeviationDisplayAfinador(cents, string) {
         colorClass = 'perfect';
         text = `¡Perfecto!`;
         if (elementsAfinador.statusText) {
-            elementsAfinador.statusText.innerHTML = `🎵 <strong>¡${string.note} perfectamente afinado!</strong>`;
+            elementsAfinador.statusText.innerHTML = `🎸 <strong>¡${string.note} perfectamente afinado!</strong>`;
         }
     } else if (absCents <= 20) {
         status = 'warning';
@@ -821,8 +1171,8 @@ function updateDeviationDisplayAfinador(cents, string) {
         text = cents > 0 ? 'Agudo' : 'Grave';
         if (elementsAfinador.statusText) {
             elementsAfinador.statusText.textContent = cents > 0 ? 
-                `🎵 ${string.note} un poco AGUDO - Afloja ligeramente` : 
-                `🎵 ${string.note} un poco GRAVE - Aprieta ligeramente`;
+                `🎸 ${string.note} un poco AGUDO - Afloja ligeramente` : 
+                `🎸 ${string.note} un poco GRAVE - Aprieta ligeramente`;
         }
     } else {
         status = 'out';
@@ -830,8 +1180,8 @@ function updateDeviationDisplayAfinador(cents, string) {
         text = cents > 0 ? 'Muy agudo' : 'Muy grave';
         if (elementsAfinador.statusText) {
             elementsAfinador.statusText.textContent = cents > 0 ? 
-                `🎵 ${string.note} muy AGUDO - Afloja la clavija` : 
-                `🎵 ${string.note} muy GRAVE - Aprieta la clavija`;
+                `🎸 ${string.note} muy AGUDO - Afloja la clavija` : 
+                `🎸 ${string.note} muy GRAVE - Aprieta la clavija`;
         }
     }
     
@@ -844,7 +1194,7 @@ function updateDeviationDisplayAfinador(cents, string) {
     }
 }
 
-// ========== METRÓNOMO MEJORADO ==========
+// ========== METRÓNOMO MEJORADO (MISMO CÓDIGO) ==========
 // Variables del metrónomo
 let metronomo = {
     isPlaying: false,
@@ -875,7 +1225,13 @@ function initMetronomo() {
     if (!metronomoElements.bpmValue) return;
     
     // Contexto de audio
-    metronomo.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+        metronomo.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (error) {
+        console.error('Error creando AudioContext:', error);
+        alert('Tu navegador no soporta la API de Audio necesaria para el metrónomo.');
+        return;
+    }
     
     // Inicializar display de compás
     initBeatDisplayMetronomo();
@@ -892,33 +1248,47 @@ function initMetronomo() {
             metronomo.audioContext.resume();
         }
     }, { once: true });
+    
+    console.log('🎵 Metrónomo inicializado');
 }
 
 // Configurar event listeners del metrónomo
 function setupMetronomoEventListeners() {
     // Slider de BPM
-    metronomoElements.bpmSlider?.addEventListener('input', () => {
-        setBpmMetronomo(parseInt(metronomoElements.bpmSlider.value));
-    });
+    if (metronomoElements.bpmSlider) {
+        metronomoElements.bpmSlider.addEventListener('input', () => {
+            setBpmMetronomo(parseInt(metronomoElements.bpmSlider.value));
+        });
+    }
     
     // Compás
-    metronomoElements.timeTop?.addEventListener('change', () => {
-        setTimeSignatureMetronomo(parseInt(metronomoElements.timeTop.value));
-    });
+    if (metronomoElements.timeTop) {
+        metronomoElements.timeTop.addEventListener('change', () => {
+            setTimeSignatureMetronomo(parseInt(metronomoElements.timeTop.value));
+        });
+    }
     
     // Botones de subdivisión
-    metronomoElements.subdivisionButtons?.querySelectorAll('.subdivision-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            setSubdivisionMetronomo(button.dataset.value);
+    if (metronomoElements.subdivisionButtons) {
+        metronomoElements.subdivisionButtons.querySelectorAll('.subdivision-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                setSubdivisionMetronomo(button.dataset.value);
+            });
         });
-    });
+    }
     
     // Botones de inicio/detención
-    metronomoElements.startBtn?.addEventListener('click', startMetronomo);
-    metronomoElements.stopBtn?.addEventListener('click', stopMetronomo);
+    if (metronomoElements.startBtn) {
+        metronomoElements.startBtn.addEventListener('click', startMetronomo);
+    }
+    if (metronomoElements.stopBtn) {
+        metronomoElements.stopBtn.addEventListener('click', stopMetronomo);
+    }
     
     // Tap tempo
-    metronomoElements.tapTempoBtn?.addEventListener('click', tapTempoMetronomo);
+    if (metronomoElements.tapTempoBtn) {
+        metronomoElements.tapTempoBtn.addEventListener('click', tapTempoMetronomo);
+    }
 }
 
 // Inicializar display de compás
@@ -1056,6 +1426,8 @@ function startMetronomo() {
         // Incrementar contador de tiempo
         metronomo.beatCount++;
     }, interval);
+    
+    console.log('▶️ Metrónomo iniciado:', metronomo.bpm, 'BPM');
 }
 
 // Detener metrónomo
@@ -1073,6 +1445,8 @@ function stopMetronomo() {
         const beatCells = metronomoElements.beatDisplay.querySelectorAll('.beat-cell');
         beatCells.forEach(cell => cell.classList.remove('active'));
     }
+    
+    console.log('⏹️ Metrónomo detenido');
 }
 
 // Actualizar display de compás
@@ -1122,6 +1496,8 @@ function tapTempoMetronomo() {
             metronomoElements.tapTempoBtn.style.transform = 'scale(1)';
         }, 100);
     }
+    
+    console.log('👆 Tap Tempo registrado');
 }
 
 // Manejar teclado shortcuts del metrónomo
@@ -1150,6 +1526,7 @@ function handleMetronomoKeyboardShortcuts(e) {
             break;
         case 't':
         case 'T':
+            e.preventDefault();
             tapTempoMetronomo();
             break;
     }
@@ -1157,35 +1534,13 @@ function handleMetronomoKeyboardShortcuts(e) {
 
 // Funciones de administración
 window.manageUsers = function() {
-    alert('Redirigiendo a gestión de usuarios...');
+    alert('🔧 Redirigiendo a gestión de usuarios...');
 };
 
 window.manageContent = function() {
-    alert('Redirigiendo a gestión de contenido...');
+    alert('📚 Redirigiendo a gestión de contenido...');
 };
 
 window.viewStatistics = function() {
-    alert('Redirigiendo a estadísticas...');
+    alert('📊 Redirigiendo a estadísticas...');
 };
-
-// ========== ANIMACIONES Y EFECTOS ==========
-// Efecto de escritura en el hero
-document.addEventListener('DOMContentLoaded', function() {
-    const heroText = document.querySelector('.hero h1');
-    if (heroText) {
-        const originalText = heroText.textContent;
-        heroText.textContent = '';
-        let i = 0;
-        
-        function typeWriter() {
-            if (i < originalText.length) {
-                heroText.textContent += originalText.charAt(i);
-                i++;
-                setTimeout(typeWriter, 50);
-            }
-        }
-        
-        // Iniciar animación después de 500ms
-        setTimeout(typeWriter, 500);
-    }
-});
