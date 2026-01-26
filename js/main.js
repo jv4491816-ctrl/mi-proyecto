@@ -69,6 +69,7 @@ let currentFormType = 'login';
 let currentUser = null;
 let firebaseAvailable = false;
 let auth = null;
+let db = null;
 let firebaseModules = null;
 
 // Verificar si Firebase Modular está disponible
@@ -121,6 +122,7 @@ function initializeFirebase() {
         
         // Asignar módulos de Firebase
         auth = window.firebaseAuth;
+        db = window.firebaseDb;
         firebaseModules = window.firebaseModules;
         
         console.log("✅ Firebase Modular disponible, configurando observador...");
@@ -133,15 +135,58 @@ function initializeFirebase() {
     }
 }
 
+// Guardar/Actualizar usuario en Firestore
+async function saveUserToFirestore(user) {
+    if (!firebaseAvailable || !db) {
+        console.log("⚠️ Firestore no disponible, omitiendo guardado en Firestore");
+        return;
+    }
+
+    try {
+        const userRef = firebaseModules.doc(db, 'users', user.uid);
+        const userSnap = await firebaseModules.getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+            // Crear nuevo usuario
+            await firebaseModules.setDoc(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email.split('@')[0],
+                photoURL: user.photoURL || null,
+                provider: user.providerData?.[0]?.providerId || 'email',
+                role: 'student',
+                progress: {
+                    level: 1,
+                    percentage: 0,
+                    lessons: 0
+                },
+                createdAt: firebaseModules.serverTimestamp(),
+                lastLogin: firebaseModules.serverTimestamp()
+            });
+            console.log("✅ Usuario creado en Firestore:", user.uid);
+        } else {
+            // Actualizar último login
+            await firebaseModules.updateDoc(userRef, {
+                lastLogin: firebaseModules.serverTimestamp()
+            });
+            console.log("✅ Usuario actualizado en Firestore:", user.uid);
+        }
+    } catch (error) {
+        console.error("❌ Error guardando usuario en Firestore:", error);
+    }
+}
+
 // Configurar observador de autenticación
 function setupAuthObserver() {
     try {
         console.log("👁️ Configurando observador de autenticación...");
         
-        firebaseModules.onAuthStateChanged(auth, (user) => {
+        firebaseModules.onAuthStateChanged(auth, async (user) => {
             console.log("🔄 Cambio en estado de autenticación:", user ? `Usuario: ${user.email}` : "Sin usuario");
             
             if (user) {
+                // Guardar usuario en Firestore
+                await saveUserToFirestore(user);
                 handleFirebaseUser(user);
             } else {
                 currentUser = null;
@@ -162,7 +207,7 @@ function setupAuthObserver() {
 function handleFirebaseUser(user) {
     console.log("👤 Procesando usuario de Firebase Modular:", user.email);
     
-    // Determinar rol
+    // Determinar rol (por defecto student, admin si el email contiene 'admin')
     const isAdmin = user.email.includes('admin') || user.email === 'admin@demo.com';
     
     currentUser = {
@@ -172,7 +217,8 @@ function handleFirebaseUser(user) {
         role: isAdmin ? 'admin' : 'student',
         isFirebaseUser: true,
         emailVerified: user.emailVerified,
-        photoURL: user.photoURL
+        photoURL: user.photoURL,
+        provider: user.providerData?.[0]?.providerId || 'email'
     };
     
     // Formatear nombre
@@ -187,7 +233,7 @@ function handleFirebaseUser(user) {
     // Actualizar UI
     updateUIForUser(currentUser);
     
-    console.log("✅ Usuario procesado:", currentUser.name, "Rol:", currentUser.role);
+    console.log("✅ Usuario procesado:", currentUser.name, "Rol:", currentUser.role, "Proveedor:", currentUser.provider);
 }
 
 // Cargar usuario desde localStorage
@@ -302,12 +348,12 @@ function loadForm(formType) {
             </div>
             
             <div class="modal-social-login">
-                <div class="modal-social-btn google">
-                    <i class="fab fa-google"></i>
-                </div>
-                <div class="modal-social-btn facebook">
-                    <i class="fab fa-facebook-f"></i>
-                </div>
+                <button class="modal-social-btn google" id="googleLoginBtn">
+                    <i class="fab fa-google"></i> Google
+                </button>
+                <button class="modal-social-btn github" id="githubLoginBtn">
+                    <i class="fab fa-github"></i> GitHub
+                </button>
             </div>
             
             <div class="modal-signup-link">
@@ -363,12 +409,12 @@ function loadForm(formType) {
             </div>
             
             <div class="modal-social-login">
-                <div class="modal-social-btn google">
-                    <i class="fab fa-google"></i>
-                </div>
-                <div class="modal-social-btn facebook">
-                    <i class="fab fa-facebook-f"></i>
-                </div>
+                <button class="modal-social-btn google" id="googleSignupBtn">
+                    <i class="fab fa-google"></i> Google
+                </button>
+                <button class="modal-social-btn github" id="githubSignupBtn">
+                    <i class="fab fa-github"></i> GitHub
+                </button>
             </div>
             
             <div class="modal-signup-link">
@@ -388,6 +434,8 @@ function setupFormEvents() {
         const togglePasswordBtn = document.getElementById('togglePasswordBtn');
         const switchToSignup = document.getElementById('modalSwitchToSignup');
         const forgotPassword = document.getElementById('modalForgotPassword');
+        const googleLoginBtn = document.getElementById('googleLoginBtn');
+        const githubLoginBtn = document.getElementById('githubLoginBtn');
         
         // Toggle password visibility
         if (togglePasswordBtn && passwordInput) {
@@ -415,6 +463,22 @@ function setupFormEvents() {
             });
         }
         
+        // Google Login
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleGoogleLogin();
+            });
+        }
+        
+        // GitHub Login
+        if (githubLoginBtn) {
+            githubLoginBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleGithubLogin();
+            });
+        }
+        
         // Login form submission
         if (loginForm) {
             loginForm.addEventListener('submit', function(e) {
@@ -427,6 +491,8 @@ function setupFormEvents() {
         const passwordInput = document.getElementById('modalSignupPassword');
         const togglePasswordBtn = document.getElementById('toggleSignupPasswordBtn');
         const switchToLogin = document.getElementById('modalSwitchToLogin');
+        const googleSignupBtn = document.getElementById('googleSignupBtn');
+        const githubSignupBtn = document.getElementById('githubSignupBtn');
         
         // Toggle password visibility
         if (togglePasswordBtn && passwordInput) {
@@ -446,6 +512,22 @@ function setupFormEvents() {
             });
         }
         
+        // Google Signup
+        if (googleSignupBtn) {
+            googleSignupBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleGoogleLogin();
+            });
+        }
+        
+        // GitHub Signup
+        if (githubSignupBtn) {
+            githubSignupBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleGithubLogin();
+            });
+        }
+        
         // Signup form submission
         if (signupForm) {
             signupForm.addEventListener('submit', function(e) {
@@ -453,6 +535,132 @@ function setupFormEvents() {
                 handleSignup();
             });
         }
+    }
+}
+
+// Manejar login con Google
+async function handleGoogleLogin() {
+    if (!firebaseAvailable || !auth || !firebaseModules) {
+        alert('Firebase no está disponible. Por favor, usa el registro por email.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
+    const originalContent = submitBtn ? submitBtn.innerHTML : null;
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con Google...';
+    }
+
+    try {
+        const provider = new firebaseModules.GoogleAuthProvider();
+        const result = await firebaseModules.signInWithPopup(auth, provider);
+        const user = result.user;
+        
+        console.log("✅ Login con Google exitoso:", user.email);
+        
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
+        }
+        
+        setTimeout(() => {
+            closeModal();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error en login con Google:', error);
+        
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+            submitBtn.classList.add('error-btn');
+        }
+        
+        let errorMessage = 'Error al conectar con Google';
+        
+        if (error.code === 'auth/popup-closed-by-user') {
+            errorMessage = 'El popup de Google fue cerrado. Intenta de nuevo.';
+        } else if (error.code === 'auth/cancelled-popup-request') {
+            errorMessage = 'La solicitud fue cancelada.';
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
+        }
+        
+        setTimeout(() => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalContent;
+                submitBtn.classList.remove('error-btn');
+            }
+            alert(errorMessage);
+        }, 1000);
+    }
+}
+
+// Manejar login con GitHub
+async function handleGithubLogin() {
+    if (!firebaseAvailable || !auth || !firebaseModules) {
+        alert('Firebase no está disponible. Por favor, usa el registro por email.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
+    const originalContent = submitBtn ? submitBtn.innerHTML : null;
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con GitHub...';
+    }
+
+    try {
+        const provider = new firebaseModules.GithubAuthProvider();
+        // Añadir permisos de scope opcionales
+        provider.addScope('read:user');
+        provider.addScope('user:email');
+        
+        const result = await firebaseModules.signInWithPopup(auth, provider);
+        const user = result.user;
+        
+        console.log("✅ Login con GitHub exitoso:", user.email);
+        
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
+        }
+        
+        setTimeout(() => {
+            closeModal();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Error en login con GitHub:', error);
+        
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+            submitBtn.classList.add('error-btn');
+        }
+        
+        let errorMessage = 'Error al conectar con GitHub';
+        
+        if (error.code === 'auth/popup-closed-by-user') {
+            errorMessage = 'El popup de GitHub fue cerrado. Intenta de nuevo.';
+        } else if (error.code === 'auth/cancelled-popup-request') {
+            errorMessage = 'La solicitud fue cancelada.';
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
+        } else if (error.code === 'auth/operation-not-allowed') {
+            errorMessage = 'La autenticación con GitHub no está habilitada. Contacta al administrador.';
+        }
+        
+        setTimeout(() => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalContent;
+                submitBtn.classList.remove('error-btn');
+            }
+            alert(errorMessage);
+        }, 1000);
     }
 }
 
@@ -470,6 +678,7 @@ async function handleLogin() {
     
     // Actualizar UI del botón
     submitBtn.disabled = true;
+    const originalContent = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
     
     try {
@@ -530,7 +739,7 @@ async function handleLogin() {
             
             setTimeout(() => {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>INICIAR SESIÓN</span><i class="fas fa-arrow-right"></i>';
+                submitBtn.innerHTML = originalContent;
                 submitBtn.classList.remove('error-btn');
                 alert('Email o contraseña incorrectos.\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• usuario@demo.com / 123456');
             }, 1000);
@@ -552,7 +761,7 @@ async function handleLogin() {
         
         setTimeout(() => {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>INICIAR SESIÓN</span><i class="fas fa-arrow-right"></i>';
+            submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
             alert(errorMessage);
         }, 1000);
@@ -585,6 +794,7 @@ async function handleSignup() {
         return;
     }
     
+    const originalContent = submitBtn.innerHTML;
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
     
@@ -660,7 +870,7 @@ async function handleSignup() {
         
         setTimeout(() => {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>CREAR CUENTA</span><i class="fas fa-user-plus"></i>';
+            submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
             alert(errorMessage + '\n\nCódigo de error: ' + error.code);
         }, 1000);
