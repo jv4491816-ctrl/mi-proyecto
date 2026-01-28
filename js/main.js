@@ -3,6 +3,7 @@ const navLinks = document.querySelectorAll('.nav-link, .back-btn, .feature-card'
 const pages = document.querySelectorAll('.page');
 const menuToggle = document.getElementById('menuToggle');
 const navLinksContainer = document.getElementById('navLinks');
+const adminNavItem = document.getElementById('admin-nav-item');
 
 // Función para cambiar de página
 function showPage(pageId) {
@@ -30,6 +31,8 @@ function showPage(pageId) {
         initAfinador();
     } else if (pageId === 'metronomo') {
         initMetronomo();
+    } else if (pageId === 'admin-panel-page') {
+        initAdminPanel();
     }
 }
 
@@ -51,141 +54,252 @@ menuToggle.addEventListener('click', function() {
 const initialPage = window.location.hash.substring(1) || 'index';
 showPage(initialPage);
 
-// ========== SISTEMA DE AUTENTICACIÓN FIREBASE v10 MODULAR ==========
+// ========== SISTEMA DE AUTENTICACIÓN FIREBASE MODULAR OPTIMIZADO ==========
 const loginModal = document.getElementById('loginModal');
 const modalFormSection = document.getElementById('modalFormSection');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalSignupBtn = document.getElementById('modalSignupBtn');
 const modalLoginBtn = document.getElementById('modalLoginBtn');
-const studentLoginBtn = document.getElementById('student-login-btn');
-const adminLoginBtn = document.getElementById('admin-login-btn');
+const loginBtn = document.getElementById('login-btn');
+const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const authButtons = document.getElementById('auth-buttons');
 const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
-const userRole = document.getElementById('user-role');
+const userAvatar = document.getElementById('user-avatar');
+const userAvatarContainer = document.getElementById('user-avatar-container');
+const userProfile = document.getElementById('user-profile');
 
 let currentFormType = 'login';
 let currentUser = null;
-let firebaseAvailable = false;
-let auth = null;
-let db = null;
-let firebaseModules = null;
 
-// Verificar si Firebase Modular está disponible
-function checkFirebaseAvailability() {
-    console.log("🔍 Verificando Firebase Modular v10...");
+// Lista de emails admin específicos
+const ADMIN_EMAILS = [
+    'jv4491816@gmail.com',
+    'fraylingay@gmail.com',
+    'admin@demo.com'
+];
+
+// ========== SISTEMA DE ESTADO DE FIREBASE OPTIMIZADO ==========
+const firebaseState = {
+    available: false,
+    auth: null,
+    db: null,
+    modules: null,
+    lastChecked: null,
+    retryAttempts: 0,
+    maxRetries: 2
+};
+
+// Función única para actualizar estado de Firebase
+function updateFirebaseState() {
+    const previousState = firebaseState.available;
     
-    if (!window.firebaseReady) {
-        console.log("❌ Firebase NO está listo (window.firebaseReady = false)");
-        return false;
+    // Verificar disponibilidad una sola vez
+    const isAvailable = Boolean(
+        window.firebaseReady && 
+        window.firebaseAuth && 
+        window.firebaseModules
+    );
+    
+    firebaseState.available = isAvailable;
+    
+    if (isAvailable) {
+        firebaseState.auth = window.firebaseAuth;
+        firebaseState.db = window.firebaseDb;
+        firebaseState.modules = window.firebaseModules;
+        firebaseState.retryAttempts = 0; // Resetear intentos si funciona
+        console.log("✅ Firebase Modular disponible");
+    } else {
+        firebaseState.auth = null;
+        firebaseState.db = null;
+        firebaseState.modules = null;
+        console.warn("⚠️ Firebase Modular NO disponible");
     }
     
-    if (!window.firebaseAuth) {
-        console.log("❌ Firebase Auth NO está disponible");
-        return false;
+    firebaseState.lastChecked = Date.now();
+    
+    // Log solo si cambió el estado
+    if (previousState !== firebaseState.available) {
+        console.log(`Firebase: ${previousState ? 'ON' : 'OFF'} → ${firebaseState.available ? 'ON' : 'OFF'}`);
     }
     
-    if (!window.firebaseModules) {
-        console.log("❌ Firebase Modules NO están disponibles");
-        return false;
-    }
-    
-    console.log("✅ Firebase Modular v10 está completamente disponible");
-    return true;
+    return firebaseState.available;
 }
 
-// Inicializar Firebase Modular
-function initializeFirebase() {
-    try {
-        console.log("🎯 Inicializando Firebase Modular v10...");
-        
-        // Verificar disponibilidad
-        firebaseAvailable = checkFirebaseAvailability();
-        
-        if (!firebaseAvailable) {
-            console.warn("⚠️ Firebase Modular NO disponible. Usando modo local.");
-            
-            // Esperar un momento por si Firebase se carga después
-            setTimeout(() => {
-                firebaseAvailable = checkFirebaseAvailability();
-                if (firebaseAvailable) {
-                    setupAuthObserver();
-                } else {
-                    loadUserFromStorage();
-                }
-            }, 1000);
-            
-            loadUserFromStorage();
-            return;
-        }
-        
-        // Asignar módulos de Firebase
-        auth = window.firebaseAuth;
-        db = window.firebaseDb;
-        firebaseModules = window.firebaseModules;
-        
-        console.log("✅ Firebase Modular disponible, configurando observador...");
-        setupAuthObserver();
-        
-    } catch (error) {
-        console.error("❌ Error inicializando Firebase Modular:", error);
-        firebaseAvailable = false;
-        loadUserFromStorage();
+// Helper para usar Firebase de forma segura y optimizada
+function useFirebase() {
+    // Solo verificar si ha pasado más de 10 segundos desde la última verificación
+    const shouldCheck = !firebaseState.lastChecked || 
+                       (Date.now() - firebaseState.lastChecked) > 10000;
+    
+    if (shouldCheck) {
+        updateFirebaseState();
     }
+    
+    return {
+        isAvailable: firebaseState.available,
+        auth: firebaseState.auth,
+        db: firebaseState.db,
+        modules: firebaseState.modules,
+        
+        // Método seguro para operaciones Firebase
+        async safeOperation(operationName, operation, fallback) {
+            if (!firebaseState.available) {
+                console.warn(`Firebase no disponible para: ${operationName}`);
+                return typeof fallback === 'function' ? await fallback() : fallback;
+            }
+            
+            try {
+                const result = await operation();
+                return result;
+            } catch (error) {
+                console.error(`Error en ${operationName}:`, error.code || error.message);
+                
+                // Si es error de red, marcar Firebase como no disponible temporalmente
+                if (error.code?.includes('network') || error.code?.includes('unavailable')) {
+                    firebaseState.available = false;
+                    firebaseState.lastChecked = Date.now();
+                }
+                
+                return typeof fallback === 'function' ? await fallback() : fallback;
+            }
+        }
+    };
+}
+
+// Verificar si un usuario es administrador
+async function checkIfUserIsAdmin(email) {
+    // Primero verificar en la lista local de emails admin
+    if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        return true;
+    }
+    
+    // Si Firebase está disponible, verificar en Firestore
+    const firebase = useFirebase();
+    
+    return await firebase.safeOperation(
+        'check-admin',
+        async () => {
+            const adminDoc = await firebase.modules.getDoc(
+                firebase.modules.doc(firebase.db, 'admins', email.toLowerCase())
+            );
+            return adminDoc.exists();
+        },
+        false // Fallback: no es admin
+    );
 }
 
 // Guardar/Actualizar usuario en Firestore
 async function saveUserToFirestore(user) {
-    if (!firebaseAvailable || !db) {
-        console.log("⚠️ Firestore no disponible, omitiendo guardado en Firestore");
-        return;
-    }
-
-    try {
-        const userRef = firebaseModules.doc(db, 'users', user.uid);
-        const userSnap = await firebaseModules.getDoc(userRef);
-        
-        if (!userSnap.exists()) {
-            // Crear nuevo usuario
-            await firebaseModules.setDoc(userRef, {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || user.email.split('@')[0],
-                photoURL: user.photoURL || null,
-                provider: user.providerData?.[0]?.providerId || 'email',
-                role: 'student',
-                progress: {
-                    level: 1,
-                    percentage: 0,
-                    lessons: 0
-                },
-                createdAt: firebaseModules.serverTimestamp(),
-                lastLogin: firebaseModules.serverTimestamp()
-            });
-            console.log("✅ Usuario creado en Firestore:", user.uid);
-        } else {
-            // Actualizar último login
-            await firebaseModules.updateDoc(userRef, {
-                lastLogin: firebaseModules.serverTimestamp()
-            });
-            console.log("✅ Usuario actualizado en Firestore:", user.uid);
-        }
-    } catch (error) {
-        console.error("❌ Error guardando usuario en Firestore:", error);
-    }
+    const firebase = useFirebase();
+    
+    return await firebase.safeOperation(
+        'save-user',
+        async () => {
+            const userRef = firebase.modules.doc(firebase.db, 'users', user.uid);
+            const userSnap = await firebase.modules.getDoc(userRef);
+            
+            // Verificar si es admin
+            const isAdmin = await checkIfUserIsAdmin(user.email);
+            
+            if (!userSnap.exists()) {
+                // Crear nuevo usuario
+                await firebase.modules.setDoc(userRef, {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    photoURL: user.photoURL || null,
+                    provider: user.providerData?.[0]?.providerId || 'email',
+                    role: isAdmin ? 'admin' : 'student',
+                    progress: {
+                        level: 1,
+                        percentage: 0,
+                        lessons: 0
+                    },
+                    createdAt: firebase.modules.serverTimestamp(),
+                    lastLogin: firebase.modules.serverTimestamp()
+                });
+                console.log("✅ Usuario creado en Firestore:", user.uid);
+            } else {
+                // Actualizar último login
+                await firebase.modules.updateDoc(userRef, {
+                    lastLogin: firebase.modules.serverTimestamp()
+                });
+                console.log("✅ Usuario actualizado en Firestore:", user.uid);
+            }
+            return true;
+        },
+        false // Fallback: no se guardó en Firestore
+    );
 }
 
-// Configurar observador de autenticación
-function setupAuthObserver() {
-    try {
-        console.log("👁️ Configurando observador de autenticación...");
+// Inicializar Firebase optimizado
+function initializeFirebase() {
+    console.log("🎯 Inicializando Firebase optimizado...");
+    
+    // Una sola verificación inicial
+    updateFirebaseState();
+    
+    if (firebaseState.available) {
+        setupAuthObserver();
+        console.log("✅ Firebase inicializado correctamente");
+    } else {
+        console.log("⚠️ Firebase no disponible, usando modo local");
+        loadUserFromStorage();
         
-        firebaseModules.onAuthStateChanged(auth, async (user) => {
+        // Un solo reintento inteligente
+        if (firebaseState.retryAttempts < firebaseState.maxRetries) {
+            firebaseState.retryAttempts++;
+            const retryDelay = firebaseState.retryAttempts * 2000; // 2s, 4s
+            
+            console.log(`Reintento ${firebaseState.retryAttempts} en ${retryDelay}ms...`);
+            
+            setTimeout(() => {
+                if (updateFirebaseState()) {
+                    setupAuthObserver();
+                }
+            }, retryDelay);
+        }
+    }
+    
+    // Detectar cambios en la conexión
+    setupConnectionListeners();
+}
+
+// Configurar listeners de conexión
+function setupConnectionListeners() {
+    window.addEventListener('online', () => {
+        console.log("📶 Conexión restaurada, verificando Firebase...");
+        updateFirebaseState();
+        if (firebaseState.available && !currentUser) {
+            setupAuthObserver();
+        }
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log("📶 Sin conexión, usando modo local");
+        firebaseState.available = false;
+    });
+}
+
+// Configurar observador de autenticación optimizado
+function setupAuthObserver() {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable || !firebase.auth || !firebase.modules) {
+        console.log("⚠️ Firebase no disponible para observador");
+        return;
+    }
+    
+    try {
+        console.log("👁️ Configurando observador de autenticación optimizado...");
+        
+        firebase.modules.onAuthStateChanged(firebase.auth, async (user) => {
             console.log("🔄 Cambio en estado de autenticación:", user ? `Usuario: ${user.email}` : "Sin usuario");
             
             if (user) {
-                // Guardar usuario en Firestore
+                // Guardar usuario en Firestore de forma segura
                 await saveUserToFirestore(user);
                 handleFirebaseUser(user);
             } else {
@@ -199,21 +313,22 @@ function setupAuthObserver() {
         
     } catch (error) {
         console.error("❌ Error configurando observador:", error);
-        firebaseAvailable = false;
+        firebaseState.available = false;
     }
 }
 
-// Manejar usuario de Firebase Modular
-function handleFirebaseUser(user) {
-    console.log("👤 Procesando usuario de Firebase Modular:", user.email);
+// Manejar usuario de Firebase optimizado
+async function handleFirebaseUser(user) {
+    console.log("👤 Procesando usuario de Firebase:", user.email);
     
-    // Determinar rol (por defecto student, admin si el email contiene 'admin')
-    const isAdmin = user.email.includes('admin') || user.email === 'admin@demo.com';
+    // Determinar rol (verificar si es admin)
+    const isAdmin = await checkIfUserIsAdmin(user.email);
     
     currentUser = {
         uid: user.uid,
         email: user.email,
         name: user.displayName || user.email.split('@')[0],
+        firstName: user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0],
         role: isAdmin ? 'admin' : 'student',
         isFirebaseUser: true,
         emailVerified: user.emailVerified,
@@ -225,6 +340,7 @@ function handleFirebaseUser(user) {
     if (!user.displayName && user.email) {
         const nameFromEmail = user.email.split('@')[0];
         currentUser.name = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
+        currentUser.firstName = currentUser.name.split(' ')[0];
     }
     
     // Guardar en localStorage
@@ -233,7 +349,7 @@ function handleFirebaseUser(user) {
     // Actualizar UI
     updateUIForUser(currentUser);
     
-    console.log("✅ Usuario procesado:", currentUser.name, "Rol:", currentUser.role, "Proveedor:", currentUser.provider);
+    console.log("✅ Usuario procesado:", currentUser.firstName, "Rol:", currentUser.role);
 }
 
 // Cargar usuario desde localStorage
@@ -241,46 +357,117 @@ function loadUserFromStorage() {
     const savedUser = localStorage.getItem('guitarraFacilUser');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
+        
+        // Asegurarse de que existe firstName
+        if (!currentUser.firstName && currentUser.name) {
+            currentUser.firstName = currentUser.name.split(' ')[0];
+        }
+        
         updateUIForUser(currentUser);
         console.log("📂 Usuario cargado desde localStorage:", currentUser.email);
     }
 }
 
-// Actualizar UI según usuario
-function updateUIForUser(user) {
-    if (user) {
-        authButtons.style.display = 'none';
-        userInfo.style.display = 'flex';
-        userName.textContent = user.name;
-        userRole.textContent = user.role === 'admin' ? 'Administrador' : 'Estudiante';
-        userRole.className = 'role-badge ' + (user.role === 'admin' ? 'role-admin' : 'role-student');
+// UI Updater optimizado
+const uiUpdater = {
+    updateUserInfo(user) {
+        if (!user) {
+            this.showAuthButtons();
+            this.hideUserInfo();
+            return;
+        }
         
-        // Mostrar contenido específico
+        this.hideAuthButtons();
+        this.showUserInfo(user);
+        this.updateAvatar(user);
+        this.updateWelcomeMessages(user);
+    },
+    
+    updateAvatar(user) {
+        if (!userAvatarContainer) return;
+        
+        if (user.photoURL) {
+            userAvatar.src = user.photoURL;
+            userAvatar.style.display = 'block';
+            userAvatarContainer.innerHTML = '';
+            userAvatarContainer.appendChild(userAvatar);
+        } else {
+            const initial = (user.firstName || user.name).charAt(0).toUpperCase();
+            userAvatarContainer.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--primary-blue); color: white; font-weight: bold; font-size: 14px;">${initial}</div>`;
+        }
+    },
+    
+    updateWelcomeMessages(user) {
+        const updates = [
+            { id: 'user-name', value: user.firstName || user.name.split(' ')[0] },
+            { id: 'admin-welcome-name', value: user.name },
+            { id: 'student-welcome-name', value: user.firstName }
+        ];
+        
+        updates.forEach(update => {
+            const element = document.getElementById(update.id);
+            if (element) element.textContent = update.value;
+        });
+    },
+    
+    showAuthButtons() {
+        if (authButtons) authButtons.style.display = 'flex';
+    },
+    
+    hideAuthButtons() {
+        if (authButtons) authButtons.style.display = 'none';
+    },
+    
+    showUserInfo(user) {
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userName) userName.textContent = user.firstName || user.name.split(' ')[0];
+    },
+    
+    hideUserInfo() {
+        if (userInfo) userInfo.style.display = 'none';
+    },
+    
+    updateAdminVisibility(isAdmin) {
+        if (adminNavItem) {
+            adminNavItem.style.display = isAdmin ? 'block' : 'none';
+        }
+        
+        // Mostrar/ocultar contenido específico
         const studentElements = document.querySelectorAll('.student-only');
         const adminElements = document.querySelectorAll('.admin-only');
         
-        if (user.role === 'admin') {
+        if (isAdmin) {
             studentElements.forEach(el => el.style.display = 'none');
             adminElements.forEach(el => el.style.display = 'block');
-            if (document.getElementById('admin-welcome-name')) {
-                document.getElementById('admin-welcome-name').textContent = user.name;
-            }
         } else {
             studentElements.forEach(el => el.style.display = 'block');
             adminElements.forEach(el => el.style.display = 'none');
-            if (document.getElementById('student-welcome-name')) {
-                document.getElementById('student-welcome-name').textContent = user.name;
-            }
         }
+    }
+};
+
+// Actualizar UI según usuario optimizado
+async function updateUIForUser(user) {
+    if (user) {
+        // Actualizar información básica
+        uiUpdater.updateUserInfo(user);
         
-        // Actualizar estadísticas del estudiante
-        if (user.role === 'student') {
+        // Verificar si es admin
+        const isAdmin = await checkIfUserIsAdmin(user.email);
+        uiUpdater.updateAdminVisibility(isAdmin);
+        
+        // Actualizar estadísticas del estudiante si no es admin
+        if (!isAdmin) {
             updateStudentStats();
         }
     } else {
-        authButtons.style.display = 'flex';
-        userInfo.style.display = 'none';
-        document.querySelectorAll('.student-only, .admin-only').forEach(el => el.style.display = 'none');
+        uiUpdater.updateUserInfo(null);
+        uiUpdater.updateAdminVisibility(false);
+        
+        // Ocultar todo el contenido específico
+        document.querySelectorAll('.student-only, .admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
     }
 }
 
@@ -289,15 +476,73 @@ function updateStudentStats() {
     const userData = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
     const progress = userData.progress || { level: 1, percentage: 0, lessons: 0 };
     
-    if (document.getElementById('student-level')) {
-        document.getElementById('student-level').textContent = progress.level;
-    }
-    if (document.getElementById('student-progress')) {
-        document.getElementById('student-progress').textContent = `${progress.percentage}%`;
-    }
-    if (document.getElementById('student-lessons')) {
-        document.getElementById('student-lessons').textContent = progress.lessons;
-    }
+    const updates = [
+        { id: 'student-level', value: progress.level },
+        { id: 'student-progress', value: `${progress.percentage}%` },
+        { id: 'student-lessons', value: progress.lessons }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element) element.textContent = update.value;
+    });
+}
+
+// Login local (usuarios demo)
+function handleLocalLogin(email, password) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            // Credenciales de demostración
+            const demoCredentials = [
+                { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
+                { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
+                { email: 'jv4491816@gmail.com', password: '123456', name: 'Juan Villar', role: 'admin' },
+                { email: 'fraylingay@gmail.com', password: '123456', name: 'Fraylingay', role: 'admin' },
+                { email: 'usuario@demo.com', password: '123456', name: 'Usuario Regular', role: 'student' }
+            ];
+            
+            const user = demoCredentials.find(
+                cred => cred.email === email && cred.password === password
+            );
+            
+            if (user) {
+                currentUser = {
+                    ...user,
+                    firstName: user.name.split(' ')[0]
+                };
+                localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+                updateUIForUser(currentUser);
+                resolve(currentUser);
+            } else {
+                reject(new Error('Email o contraseña incorrectos'));
+            }
+        }, 1000);
+    });
+}
+
+// Registro local
+function handleLocalSignup(name, email, password) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            // Verificar si es admin
+            const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+            
+            currentUser = {
+                name: name,
+                firstName: name.split(' ')[0],
+                email: email,
+                role: isAdmin ? 'admin' : 'student',
+                progress: { level: 1, percentage: 0, lessons: 0 },
+                createdAt: new Date().toISOString(),
+                isLocalUser: true
+            };
+            
+            localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+            updateUIForUser(currentUser);
+            
+            resolve(currentUser);
+        }, 1000);
+    });
 }
 
 // Cargar formulario en el modal
@@ -467,7 +712,7 @@ function setupFormEvents() {
         if (googleLoginBtn) {
             googleLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGoogleLogin();
+                handleSocialLogin('google');
             });
         }
         
@@ -475,7 +720,7 @@ function setupFormEvents() {
         if (githubLoginBtn) {
             githubLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGithubLogin();
+                handleSocialLogin('github');
             });
         }
         
@@ -516,7 +761,7 @@ function setupFormEvents() {
         if (googleSignupBtn) {
             googleSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGoogleLogin();
+                handleSocialLogin('google');
             });
         }
         
@@ -524,7 +769,7 @@ function setupFormEvents() {
         if (githubSignupBtn) {
             githubSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGithubLogin();
+                handleSocialLogin('github');
             });
         }
         
@@ -538,137 +783,88 @@ function setupFormEvents() {
     }
 }
 
-// Manejar login con Google
-async function handleGoogleLogin() {
-    if (!firebaseAvailable || !auth || !firebaseModules) {
-        alert('Firebase no está disponible. Por favor, usa el registro por email.');
+// Manejar login con redes sociales optimizado
+async function handleSocialLogin(providerType) {
+    const firebase = useFirebase();
+    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
+    
+    if (!submitBtn) return;
+    
+    const originalContent = submitBtn.innerHTML;
+    const originalDisabled = submitBtn.disabled;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Conectando con ${providerType === 'google' ? 'Google' : 'GitHub'}...`;
+    
+    // Si Firebase no está disponible
+    if (!firebase.isAvailable) {
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
+        
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+            submitBtn.classList.remove('error-btn');
+            alert('Firebase no está disponible. Por favor, usa el registro por email.');
+        }, 1000);
         return;
     }
-
-    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
-    const originalContent = submitBtn ? submitBtn.innerHTML : null;
     
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con Google...';
-    }
-
     try {
-        const provider = new firebaseModules.GoogleAuthProvider();
-        const result = await firebaseModules.signInWithPopup(auth, provider);
+        const provider = providerType === 'google' 
+            ? new firebase.modules.GoogleAuthProvider()
+            : new firebase.modules.GithubAuthProvider();
+        
+        if (providerType === 'github') {
+            provider.addScope('read:user');
+            provider.addScope('user:email');
+        }
+        
+        const result = await firebase.modules.signInWithPopup(firebase.auth, provider);
         const user = result.user;
         
-        console.log("✅ Login con Google exitoso:", user.email);
+        console.log(`✅ Login con ${providerType} exitoso:`, user.email);
         
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-        }
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+        submitBtn.classList.add('success-btn');
         
         setTimeout(() => {
             closeModal();
         }, 1000);
         
     } catch (error) {
-        console.error('❌ Error en login con Google:', error);
+        console.error(`❌ Error en login con ${providerType}:`, error);
         
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
-        }
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
         
-        let errorMessage = 'Error al conectar con Google';
+        let errorMessage = `Error al conectar con ${providerType === 'google' ? 'Google' : 'GitHub'}`;
         
-        if (error.code === 'auth/popup-closed-by-user') {
-            errorMessage = 'El popup de Google fue cerrado. Intenta de nuevo.';
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            errorMessage = 'La solicitud fue cancelada.';
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
-        }
+        const errorMessages = {
+            'auth/popup-closed-by-user': 'El popup fue cerrado. Intenta de nuevo.',
+            'auth/cancelled-popup-request': 'La solicitud fue cancelada.',
+            'auth/account-exists-with-different-credential': 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.',
+            'auth/operation-not-allowed': `La autenticación con ${providerType === 'google' ? 'Google' : 'GitHub'} no está habilitada.`
+        };
+        
+        errorMessage = errorMessages[error.code] || errorMessage;
         
         setTimeout(() => {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-            }
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+            submitBtn.classList.remove('error-btn');
             alert(errorMessage);
         }, 1000);
     }
 }
 
-// Manejar login con GitHub
-async function handleGithubLogin() {
-    if (!firebaseAvailable || !auth || !firebaseModules) {
-        alert('Firebase no está disponible. Por favor, usa el registro por email.');
-        return;
-    }
-
-    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
-    const originalContent = submitBtn ? submitBtn.innerHTML : null;
-    
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con GitHub...';
-    }
-
-    try {
-        const provider = new firebaseModules.GithubAuthProvider();
-        // Añadir permisos de scope opcionales
-        provider.addScope('read:user');
-        provider.addScope('user:email');
-        
-        const result = await firebaseModules.signInWithPopup(auth, provider);
-        const user = result.user;
-        
-        console.log("✅ Login con GitHub exitoso:", user.email);
-        
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-        }
-        
-        setTimeout(() => {
-            closeModal();
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Error en login con GitHub:', error);
-        
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
-        }
-        
-        let errorMessage = 'Error al conectar con GitHub';
-        
-        if (error.code === 'auth/popup-closed-by-user') {
-            errorMessage = 'El popup de GitHub fue cerrado. Intenta de nuevo.';
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            errorMessage = 'La solicitud fue cancelada.';
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-            errorMessage = 'La autenticación con GitHub no está habilitada. Contacta al administrador.';
-        }
-        
-        setTimeout(() => {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-            }
-            alert(errorMessage);
-        }, 1000);
-    }
-}
-
-// Manejar login con Firebase Modular
+// Manejar login optimizado
 async function handleLogin() {
     const email = document.getElementById('modalEmail')?.value.trim();
     const password = document.getElementById('modalPassword')?.value;
     const submitBtn = document.getElementById('modalSubmitBtn');
+    
+    if (!submitBtn) return;
     
     // Validaciones básicas
     if (!email || !password) {
@@ -676,72 +872,52 @@ async function handleLogin() {
         return;
     }
     
+    // Validar formato de email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Por favor, ingresa un email válido');
+        return;
+    }
+    
     // Actualizar UI del botón
-    submitBtn.disabled = true;
     const originalContent = submitBtn.innerHTML;
+    submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
     
     try {
-        console.log("🔑 Intentando login... Firebase disponible:", firebaseAvailable);
+        const firebase = useFirebase();
         
-        // PRIMERO intentar con Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability()) {
-            console.log("✅ Usando Firebase Modular para login...");
-            
-            const userCredential = await firebaseModules.signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            console.log("✅ Login exitoso con Firebase Modular:", user.email);
-            
-            // Éxito con Firebase
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-            
-            setTimeout(() => {
-                closeModal();
-            }, 1000);
-            return;
-        }
-        
-        // SI NO, usar login local (usuarios demo)
-        console.log("⚠️ Firebase Modular no disponible, usando login local...");
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Credenciales de demostración CORREGIDAS
-        const demoCredentials = [
-            { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
-            { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
-            { email: 'usuario@demo.com', password: '123456', name: 'Usuario Regular', role: 'student' }
-        ];
-        
-        const user = demoCredentials.find(
-            cred => cred.email === email && cred.password === password
-        );
-        
-        if (user) {
-            // Login exitoso con usuario demo
-            currentUser = user;
-            localStorage.setItem('guitarraFacilUser', JSON.stringify(user));
-            updateUIForUser(user);
+        if (firebase.isAvailable) {
+            // Intentar login con Firebase
+            await firebase.safeOperation(
+                'login',
+                async () => {
+                    const userCredential = await firebase.modules.signInWithEmailAndPassword(
+                        firebase.auth, email, password
+                    );
+                    return userCredential.user;
+                },
+                async () => {
+                    // Fallback a login local
+                    return await handleLocalLogin(email, password);
+                }
+            );
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
             submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
                 closeModal();
-                console.log('✅ Login exitoso con usuario demo:', user.email);
             }, 1000);
+            
         } else {
-            // Credenciales incorrectas
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
+            // Usar login local directamente
+            await handleLocalLogin(email, password);
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-                alert('Email o contraseña incorrectos.\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• usuario@demo.com / 123456');
+                closeModal();
             }, 1000);
         }
         
@@ -753,10 +929,18 @@ async function handleLogin() {
         
         let errorMessage = 'Error al iniciar sesión';
         
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-            errorMessage = 'Email o contraseña incorrectos';
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = 'Demasiados intentos. Intenta más tarde.';
+        const errorMessages = {
+            'auth/user-not-found': 'No existe una cuenta con este email',
+            'auth/wrong-password': 'Contraseña incorrecta',
+            'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
+            'Email o contraseña incorrectos': 'Email o contraseña incorrectos'
+        };
+        
+        errorMessage = errorMessages[error.message] || errorMessages[error.code] || errorMessage;
+        
+        // Mostrar usuarios demo disponibles
+        if (errorMessage.includes('incorrectos')) {
+            errorMessage += '\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• jv4491816@gmail.com / 123456\n• fraylingay@gmail.com / 123456\n• usuario@demo.com / 123456';
         }
         
         setTimeout(() => {
@@ -768,20 +952,14 @@ async function handleLogin() {
     }
 }
 
-// Manejar registro con Firebase Modular
+// Manejar registro optimizado
 async function handleSignup() {
     const name = document.getElementById('modalSignupName')?.value.trim();
     const email = document.getElementById('modalSignupEmail')?.value.trim();
     const password = document.getElementById('modalSignupPassword')?.value;
     const submitBtn = document.getElementById('modalSignupSubmitBtn');
     
-    console.log("📝 === DEBUG REGISTRO FIREBASE MODULAR ===");
-    console.log("Email:", email);
-    console.log("Firebase disponible:", firebaseAvailable);
-    console.log("checkFirebaseAvailability:", checkFirebaseAvailability());
-    console.log("auth disponible:", !!auth);
-    console.log("firebaseModules:", !!firebaseModules);
-    console.log("==========================");
+    if (!submitBtn) return;
     
     // Validaciones básicas
     if (!name || !email || !password) {
@@ -794,63 +972,65 @@ async function handleSignup() {
         return;
     }
     
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Por favor, ingresa un email válido');
+        return;
+    }
+    
     const originalContent = submitBtn.innerHTML;
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
     
     try {
-        // PRIMERO intentar con Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            console.log("🔥 Creando usuario en Firebase Modular...");
-            
-            const userCredential = await firebaseModules.createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            console.log("✅ Usuario creado en Firebase Modular:", user.uid);
-            console.log("📧 Email:", user.email);
-            
-            // Actualizar nombre en perfil
-            await firebaseModules.updateProfile(user, { displayName: name });
-            
-            // Enviar email de verificación
-            await firebaseModules.sendEmailVerification(user);
-            console.log("📧 Email de verificación enviado");
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            // Crear usuario en Firebase
+            await firebase.safeOperation(
+                'signup',
+                async () => {
+                    const userCredential = await firebase.modules.createUserWithEmailAndPassword(
+                        firebase.auth, email, password
+                    );
+                    const user = userCredential.user;
+                    
+                    // Actualizar nombre en perfil
+                    await firebase.modules.updateProfile(user, { displayName: name });
+                    
+                    // Enviar email de verificación
+                    await firebase.modules.sendEmailVerification(user);
+                    
+                    return user;
+                },
+                async () => {
+                    // Fallback a registro local
+                    return await handleLocalSignup(name, email, password);
+                }
+            );
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
             submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
                 closeModal();
-                alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en Firebase.\n\nHemos enviado un email de verificación a:\n${email}\n\nPor favor verifica tu email.`);
+                alert(`¡Bienvenido ${name.split(' ')[0]}! 🎸\n\nCuenta creada exitosamente en Firebase.\n\nHemos enviado un email de verificación a:\n${email}\n\nPor favor verifica tu email.`);
             }, 1500);
             
-            return;
+        } else {
+            // Usar registro local directamente
+            await handleLocalSignup(name, email, password);
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
+            submitBtn.classList.add('success-btn');
+            
+            const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+            const roleMsg = isAdmin ? 'Administrador' : 'Estudiante';
+            
+            setTimeout(() => {
+                closeModal();
+                alert(`¡Bienvenido ${name.split(' ')[0]}! 🎸\n\nCuenta creada exitosamente en modo local.\n\nEmail: ${email}\nRol: ${roleMsg}`);
+            }, 1000);
         }
-        
-        // SI NO, usar registro local
-        console.log("⚠️ Firebase Modular no disponible, usando registro local...");
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        currentUser = {
-            name: name,
-            email: email,
-            role: 'student',
-            progress: { level: 1, percentage: 0, lessons: 0 },
-            createdAt: new Date().toISOString(),
-            isLocalUser: true
-        };
-        
-        localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
-        updateUIForUser(currentUser);
-        
-        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
-        submitBtn.classList.add('success-btn');
-        
-        setTimeout(() => {
-            closeModal();
-            alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en modo local.\n\nEmail: ${email}\nContraseña: ${password}`);
-        }, 1000);
         
     } catch (error) {
         console.error('❌ Error en registro:', error);
@@ -860,24 +1040,25 @@ async function handleSignup() {
         
         let errorMessage = 'Error al crear la cuenta';
         
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = 'Este email ya está registrado';
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = 'Email inválido';
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = 'Contraseña muy débil (mínimo 6 caracteres)';
-        }
+        const errorMessages = {
+            'auth/email-already-in-use': 'Este email ya está registrado',
+            'auth/invalid-email': 'Email inválido',
+            'auth/weak-password': 'Contraseña muy débil (mínimo 6 caracteres)',
+            'auth/operation-not-allowed': 'El registro con email/contraseña no está habilitado'
+        };
+        
+        errorMessage = errorMessages[error.code] || errorMessage;
         
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage + '\n\nCódigo de error: ' + error.code);
+            alert(errorMessage + (error.code ? '\n\nCódigo: ' + error.code : ''));
         }, 1000);
     }
 }
 
-// Manejar "Olvidé mi contraseña" con Firebase Modular
+// Manejar "Olvidé mi contraseña" optimizado
 async function handleForgotPassword() {
     const email = prompt('Por favor, ingresa tu email para recuperar tu contraseña:');
     
@@ -889,25 +1070,52 @@ async function handleForgotPassword() {
     }
     
     try {
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            await firebaseModules.sendPasswordResetEmail(auth, email);
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'forgot-password',
+                async () => {
+                    await firebase.modules.sendPasswordResetEmail(firebase.auth, email);
+                    return true;
+                },
+                false
+            );
+            
             alert(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`);
+            
         } else {
-            alert(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}`);
+            alert(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}\n\nUsuarios demo disponibles:\n• estudiante@demo.com\n• admin@demo.com\n• jv4491816@gmail.com\n• fraylingay@gmail.com\n• usuario@demo.com`);
         }
+        
     } catch (error) {
         console.error('Error al enviar email de recuperación:', error);
-        alert(`Error: ${error.message}`);
+        
+        const errorMessages = {
+            'auth/user-not-found': 'No existe una cuenta con este email',
+            'auth/invalid-email': 'Email inválido'
+        };
+        
+        const errorMessage = errorMessages[error.code] || error.message || 'Error al enviar el email';
+        alert(`Error: ${errorMessage}`);
     }
 }
 
-// Manejar logout con Firebase Modular
+// Manejar logout optimizado
 async function handleLogout() {
     try {
-        // Cerrar sesión en Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            await firebaseModules.signOut(auth);
-            console.log("✅ Sesión cerrada en Firebase Modular");
+        const firebase = useFirebase();
+        
+        // Cerrar sesión en Firebase si está disponible
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'logout',
+                async () => {
+                    await firebase.modules.signOut(firebase.auth);
+                    return true;
+                },
+                true
+            );
         }
         
         // Limpiar datos locales
@@ -919,7 +1127,7 @@ async function handleLogout() {
         
     } catch (error) {
         console.error('Error al cerrar sesión:', error);
-        alert('Error al cerrar sesión: ' + error.message);
+        alert('Error al cerrar sesión. Intenta de nuevo.');
     }
 }
 
@@ -938,11 +1146,11 @@ function closeModal() {
 }
 
 // Event Listeners
-if (studentLoginBtn) {
-    studentLoginBtn.addEventListener('click', () => openModal('login'));
+if (loginBtn) {
+    loginBtn.addEventListener('click', () => openModal('login'));
 }
-if (adminLoginBtn) {
-    adminLoginBtn.addEventListener('click', () => openModal('login'));
+if (registerBtn) {
+    registerBtn.addEventListener('click', () => openModal('signup'));
 }
 if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', closeModal);
@@ -966,35 +1174,541 @@ if (loginModal) {
     });
 }
 
-// Inicializar Firebase Modular cuando se cargue la página
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM cargado, inicializando aplicación Firebase Modular...');
+// ========== PANEL DE ADMINISTRACIÓN OPTIMIZADO ==========
+let adminUsers = [];
+const userCache = {
+    cache: new Map(),
+    timeout: 2 * 60 * 1000, // 2 minutos
     
-    // Esperar un momento para asegurar que Firebase se cargó
-    setTimeout(() => {
-        initializeFirebase();
-    }, 500);
-    
-    // Efecto de escritura en el hero
-    const heroText = document.querySelector('.hero h1');
-    if (heroText) {
-        const originalText = heroText.textContent;
-        heroText.textContent = '';
-        let i = 0;
+    get(key) {
+        const item = this.cache.get(key);
+        if (!item) return null;
         
-        function typeWriter() {
-            if (i < originalText.length) {
-                heroText.textContent += originalText.charAt(i);
-                i++;
-                setTimeout(typeWriter, 50);
-            }
+        if (Date.now() - item.timestamp > this.timeout) {
+            this.cache.delete(key);
+            return null;
         }
         
-        setTimeout(typeWriter, 500);
+        return item.data;
+    },
+    
+    set(key, data) {
+        this.cache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    },
+    
+    clear() {
+        this.cache.clear();
     }
-});
+};
 
-// ========== AFINADOR MEJORADO (MISMO CÓDIGO) ==========
+// Inicializar panel de administración
+function initAdminPanel() {
+    console.log("👑 Inicializando panel de administración...");
+    
+    // Verificar que el usuario actual es admin
+    if (!currentUser || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) {
+        alert("⚠️ Acceso denegado. Solo administradores pueden acceder a esta página.");
+        showPage('index');
+        return;
+    }
+    
+    // Actualizar información del admin
+    const updates = [
+        { id: 'admin-username', value: currentUser.firstName || currentUser.name },
+        { id: 'admin-email', value: currentUser.email }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element) element.textContent = update.value;
+    });
+    
+    // Cargar usuarios
+    loadAllUsers();
+    
+    // Configurar búsqueda
+    const searchInput = document.getElementById('user-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterUsers);
+    }
+}
+
+// Cargar todos los usuarios optimizado
+async function loadAllUsers() {
+    const usersList = document.getElementById('users-list');
+    if (!usersList) return;
+    
+    // Verificar caché primero
+    const cachedUsers = userCache.get('allUsers');
+    if (cachedUsers) {
+        adminUsers = cachedUsers;
+        updateUsersTable();
+        updateAdminStats();
+        console.log("📦 Usuarios cargados desde caché");
+        return;
+    }
+    
+    usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando usuarios...</td></tr>';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            // Cargar desde Firestore
+            const usersSnapshot = await firebase.modules.getDocs(
+                firebase.modules.collection(firebase.db, 'users')
+            );
+            
+            adminUsers = [];
+            usersSnapshot.forEach(doc => {
+                const userData = doc.data();
+                adminUsers.push({
+                    id: doc.id,
+                    ...userData,
+                    createdAt: userData.createdAt?.toDate() || new Date(),
+                    lastLogin: userData.lastLogin?.toDate() || null
+                });
+            });
+            
+            console.log(`✅ ${adminUsers.length} usuarios cargados desde Firestore`);
+            
+        } else {
+            // Usar datos demo
+            adminUsers = [
+                {
+                    id: '1',
+                    email: 'jv4491816@gmail.com',
+                    displayName: 'Juan Villar',
+                    role: 'admin',
+                    createdAt: new Date('2024-01-01'),
+                    lastLogin: new Date(),
+                    photoURL: '',
+                    progress: { level: 5, percentage: 80, lessons: 25 }
+                },
+                {
+                    id: '2',
+                    email: 'fraylingay@gmail.com',
+                    displayName: 'Fraylingay',
+                    role: 'admin',
+                    createdAt: new Date('2024-01-02'),
+                    lastLogin: new Date(),
+                    progress: { level: 4, percentage: 70, lessons: 20 }
+                },
+                {
+                    id: '3',
+                    email: 'estudiante@demo.com',
+                    displayName: 'Estudiante Demo',
+                    role: 'student',
+                    createdAt: new Date('2024-01-03'),
+                    lastLogin: new Date(),
+                    progress: { level: 2, percentage: 40, lessons: 10 }
+                },
+                {
+                    id: '4',
+                    email: 'usuario@demo.com',
+                    displayName: 'Usuario Regular',
+                    role: 'student',
+                    createdAt: new Date('2024-01-04'),
+                    lastLogin: null,
+                    progress: { level: 1, percentage: 10, lessons: 2 }
+                }
+            ];
+            
+            console.log(`📋 ${adminUsers.length} usuarios demo cargados`);
+        }
+        
+        // Guardar en caché
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        updateAdminStats();
+        
+    } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--accent-red);"><i class="fas fa-exclamation-triangle"></i> Error al cargar usuarios</td></tr>';
+    }
+}
+
+// Actualizar tabla de usuarios optimizada
+function updateUsersTable() {
+    const usersList = document.getElementById('users-list');
+    if (!usersList || !adminUsers.length) {
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">No hay usuarios para mostrar</td></tr>';
+        return;
+    }
+    
+    // Usar DocumentFragment para mejor rendimiento
+    const fragment = document.createDocumentFragment();
+    
+    adminUsers.forEach(user => {
+        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        const isCurrentUser = user.email === currentUser?.email;
+        const isAdmin = user.role === 'admin';
+        
+        // Obtener iniciales para avatar
+        const displayName = user.displayName || user.email.split('@')[0];
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        
+        // Formatear fechas
+        const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
+        const lastAccess = user.lastLogin ? 
+            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+            'Nunca';
+        
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>
+                <div class="user-info-cell">
+                    <div class="user-avatar">
+                        ${user.photoURL ? 
+                            `<img src="${user.photoURL}" alt="${displayName}" class="user-avatar-img">` :
+                            `<span>${initials}</span>`
+                        }
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">
+                            ${displayName}
+                            ${isCurrentUser ? '<span class="user-you-badge">(Tú)</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>${user.email}</td>
+            <td>${registerDate}</td>
+            <td>${lastAccess}</td>
+            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <div class="user-actions">
+                    <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-icon-btn" onclick="toggleUserRole('${user.id}', '${user.email}')" title="${isAdmin ? 'Quitar Admin' : 'Hacer Admin'}">
+                        <i class="fas ${isAdmin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                    </button>
+                    ${!isCurrentUser ? `
+                        <button class="action-icon-btn delete" onclick="deleteUser('${user.id}', '${user.email}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        
+        fragment.appendChild(row);
+    });
+    
+    usersList.innerHTML = '';
+    usersList.appendChild(fragment);
+}
+
+// Actualizar estadísticas del admin optimizado
+function updateAdminStats() {
+    const totalUsers = adminUsers.length;
+    const activeUsers = adminUsers.filter(user => 
+        user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000)
+    ).length;
+    
+    const newToday = adminUsers.filter(user => 
+        user.createdAt.toDateString() === new Date().toDateString()
+    ).length;
+    
+    const studentCount = adminUsers.filter(user => user.role === 'student').length;
+    const adminCount = adminUsers.filter(user => user.role === 'admin').length;
+    
+    const stats = [
+        { id: 'total-users', value: totalUsers },
+        { id: 'active-users', value: activeUsers },
+        { id: 'new-today', value: newToday },
+        { id: 'student-count', value: studentCount },
+        { id: 'admin-count', value: adminCount },
+        { id: 'active-count', value: activeUsers },
+        { id: 'inactive-count', value: totalUsers - activeUsers }
+    ];
+    
+    stats.forEach(stat => {
+        const element = document.getElementById(stat.id);
+        if (element) element.textContent = stat.value;
+    });
+}
+
+// Filtrar usuarios por búsqueda optimizado
+function filterUsers() {
+    const searchTerm = document.getElementById('user-search').value.toLowerCase().trim();
+    const usersList = document.getElementById('users-list');
+    
+    if (!usersList) return;
+    
+    if (!searchTerm) {
+        updateUsersTable();
+        return;
+    }
+    
+    const filteredUsers = adminUsers.filter(user => 
+        user.email.toLowerCase().includes(searchTerm) ||
+        (user.displayName && user.displayName.toLowerCase().includes(searchTerm)) ||
+        user.role.toLowerCase().includes(searchTerm)
+    );
+    
+    if (filteredUsers.length === 0) {
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">No se encontraron usuarios</td></tr>';
+        return;
+    }
+    
+    // Actualizar solo con usuarios filtrados
+    const fragment = document.createDocumentFragment();
+    
+    filteredUsers.forEach(user => {
+        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        const isCurrentUser = user.email === currentUser?.email;
+        const isAdmin = user.role === 'admin';
+        
+        // Obtener iniciales para avatar
+        const displayName = user.displayName || user.email.split('@')[0];
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        
+        // Formatear fechas
+        const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
+        const lastAccess = user.lastLogin ? 
+            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+            'Nunca';
+        
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>
+                <div class="user-info-cell">
+                    <div class="user-avatar">
+                        ${user.photoURL ? 
+                            `<img src="${user.photoURL}" alt="${displayName}" class="user-avatar-img">` :
+                            `<span>${initials}</span>`
+                        }
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">
+                            ${displayName}
+                            ${isCurrentUser ? '<span class="user-you-badge">(Tú)</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>${user.email}</td>
+            <td>${registerDate}</td>
+            <td>${lastAccess}</td>
+            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <div class="user-actions">
+                    <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-icon-btn" onclick="toggleUserRole('${user.id}', '${user.email}')" title="${isAdmin ? 'Quitar Admin' : 'Hacer Admin'}">
+                        <i class="fas ${isAdmin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                    </button>
+                    ${!isCurrentUser ? `
+                        <button class="action-icon-btn delete" onclick="deleteUser('${user.id}', '${user.email}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        
+        fragment.appendChild(row);
+    });
+    
+    usersList.innerHTML = '';
+    usersList.appendChild(fragment);
+}
+
+// Funciones del panel de administración
+window.manageUsers = function() {
+    showPage('admin-panel-page');
+};
+
+window.manageContent = function() {
+    alert('📚 Redirigiendo a gestión de contenido...');
+};
+
+window.viewStatistics = function() {
+    alert('📊 Redirigiendo a estadísticas...');
+};
+
+// Toggle rol de usuario optimizado
+async function toggleUserRole(userId, userEmail) {
+    if (!confirm(`¿Estás seguro de cambiar el rol de ${userEmail}?`)) {
+        return;
+    }
+    
+    const user = adminUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    const newRole = user.role === 'admin' ? 'student' : 'admin';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'toggle-role',
+                async () => {
+                    await firebase.modules.updateDoc(
+                        firebase.modules.doc(firebase.db, 'users', userId),
+                        { role: newRole }
+                    );
+                    return true;
+                },
+                false
+            );
+        }
+        
+        // Actualizar en la lista local
+        user.role = newRole;
+        
+        // Actualizar cache
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        updateAdminStats();
+        
+        alert(`✅ Rol actualizado: ${userEmail} ahora es ${newRole === 'admin' ? 'administrador' : 'estudiante'}`);
+        
+    } catch (error) {
+        console.error('❌ Error cambiando rol:', error);
+        alert('Error al cambiar el rol del usuario');
+    }
+}
+
+// Editar usuario
+function editUser(userId) {
+    const user = adminUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    const newName = prompt('Nuevo nombre para el usuario:', user.displayName || '');
+    if (newName === null) return;
+    
+    if (newName.trim()) {
+        user.displayName = newName.trim();
+        
+        // Actualizar cache
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        alert('✅ Nombre actualizado correctamente');
+    }
+}
+
+// Eliminar usuario optimizado
+async function deleteUser(userId, userEmail) {
+    if (!confirm(`¿Estás seguro de eliminar al usuario ${userEmail}?\nEsta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'delete-user',
+                async () => {
+                    await firebase.modules.deleteDoc(
+                        firebase.modules.doc(firebase.db, 'users', userId)
+                    );
+                    return true;
+                },
+                false
+            );
+        }
+        
+        // Eliminar de la lista local
+        adminUsers = adminUsers.filter(u => u.id !== userId);
+        
+        // Actualizar cache
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        updateAdminStats();
+        
+        alert('✅ Usuario eliminado correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error eliminando usuario:', error);
+        alert('Error al eliminar el usuario');
+    }
+}
+
+// Enviar anuncio a todos los usuarios
+function sendAnnouncement() {
+    const message = prompt('Escribe el anuncio que quieres enviar a todos los usuarios:');
+    if (message && message.trim()) {
+        alert(`📢 Anuncio enviado a ${adminUsers.length} usuarios:\n\n"${message}"`);
+    }
+}
+
+// Exportar datos de usuarios
+function exportUsers() {
+    const csvContent = [
+        ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Estado'],
+        ...adminUsers.map(user => [
+            user.displayName || '',
+            user.email,
+            user.role === 'admin' ? 'Administrador' : 'Estudiante',
+            user.createdAt.toLocaleDateString(),
+            user.lastLogin ? user.lastLogin.toLocaleDateString() : 'Nunca',
+            user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000) ? 'Activo' : 'Inactivo'
+        ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `usuarios-guitarra-facil-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert(`✅ Datos exportados: ${adminUsers.length} usuarios`);
+}
+
+// Generar reporte mensual
+function generateReport() {
+    const today = new Date();
+    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    
+    const newThisMonth = adminUsers.filter(user => user.createdAt >= monthAgo).length;
+    const activeThisMonth = adminUsers.filter(user => user.lastLogin && user.lastLogin >= monthAgo).length;
+    
+    alert(`📊 Reporte Mensual:\n\n• Nuevos usuarios este mes: ${newThisMonth}\n• Usuarios activos este mes: ${activeThisMonth}\n• Total usuarios: ${adminUsers.length}\n• Administradores: ${adminUsers.filter(u => u.role === 'admin').length}\n• Estudiantes: ${adminUsers.filter(u => u.role === 'student').length}`);
+}
+
+// Respaldar base de datos
+function backupDatabase() {
+    const backupData = {
+        timestamp: new Date().toISOString(),
+        totalUsers: adminUsers.length,
+        users: adminUsers
+    };
+    
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-guitarra-facil-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert('✅ Respaldo de base de datos generado y descargado');
+}
+
+// ========== AFINADOR MEJORADO CON DETECCIÓN REAL ==========
 // Configuración de cuerdas
 const STRINGS = {
     'mi-high': {
@@ -1111,6 +1825,7 @@ function selectStringAfinador(stringType) {
 // Actualizar display según la cuerda seleccionada
 function updateStringDisplayAfinador() {
     const string = STRINGS[state.currentString];
+    
     if (elementsAfinador.targetFrequency) {
         elementsAfinador.targetFrequency.innerHTML = 
             `Frecuencia objetivo: <strong>${string.frequency} Hz</strong> (${string.note})`;
@@ -1161,12 +1876,7 @@ async function startListeningAfinador() {
         state.microphone.connect(state.analyser);
         
         state.isListening = true;
-        if (elementsAfinador.micStatus) {
-            elementsAfinador.micStatus.textContent = 'Desactivar Micrófono';
-        }
-        if (elementsAfinador.micToggle) {
-            elementsAfinador.micToggle.classList.add('listening');
-        }
+        updateAfinadorUI(true);
         
         const string = STRINGS[state.currentString];
         if (elementsAfinador.statusText) {
@@ -1186,30 +1896,8 @@ async function startListeningAfinador() {
 
 // Detener escucha por micrófono en el afinador
 function stopListeningAfinador() {
-    if (state.animationId) {
-        cancelAnimationFrame(state.animationId);
-        state.animationId = null;
-    }
-    
-    if (state.microphone) {
-        state.microphone.disconnect();
-        state.microphone = null;
-    }
-    
-    if (state.audioContext) {
-        state.audioContext.close();
-        state.audioContext = null;
-    }
-    
-    state.isListening = false;
-    state.frequencyHistory = [];
-    state.lastValidDetection = null;
-    if (elementsAfinador.micStatus) {
-        elementsAfinador.micStatus.textContent = 'Activar Micrófono';
-    }
-    if (elementsAfinador.micToggle) {
-        elementsAfinador.micToggle.classList.remove('listening');
-    }
+    cleanupAfinadorResources();
+    updateAfinadorUI(false);
     
     const string = STRINGS[state.currentString];
     if (elementsAfinador.statusText) {
@@ -1218,6 +1906,58 @@ function stopListeningAfinador() {
     
     resetDisplayAfinador();
     console.log('🎤 Micrófono desactivado');
+}
+
+// Limpiar recursos del afinador
+function cleanupAfinadorResources() {
+    // Cancelar animación
+    if (state.animationId) {
+        cancelAnimationFrame(state.animationId);
+        state.animationId = null;
+    }
+    
+    // Limpiar recursos de audio
+    if (state.microphone) {
+        try {
+            state.microphone.disconnect();
+            const stream = state.microphone.mediaStream;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        } catch (error) {
+            console.warn("Error desconectando micrófono:", error);
+        }
+        state.microphone = null;
+    }
+    
+    // Cerrar contexto de audio
+    if (state.audioContext) {
+        if (state.audioContext.state !== 'closed') {
+            state.audioContext.close().catch(console.error);
+        }
+        state.audioContext = null;
+    }
+    
+    // Limpiar estado
+    state.isListening = false;
+    state.frequencyHistory = [];
+    state.lastValidDetection = null;
+}
+
+// Actualizar UI del afinador
+function updateAfinadorUI(isListening) {
+    if (elementsAfinador.micStatus) {
+        elementsAfinador.micStatus.textContent = isListening ? 
+            'Desactivar Micrófono' : 'Activar Micrófono';
+    }
+    
+    if (elementsAfinador.micToggle) {
+        if (isListening) {
+            elementsAfinador.micToggle.classList.add('listening');
+        } else {
+            elementsAfinador.micToggle.classList.remove('listening');
+        }
+    }
 }
 
 // Resetear display del afinador
@@ -1275,7 +2015,7 @@ function analyzeAudioAfinador() {
     const dataArray = new Float32Array(bufferLength);
     state.analyser.getFloatTimeDomainData(dataArray);
     
-    // Detectar frecuencia (simplificado para demostración)
+    // Detectar frecuencia con algoritmo de autocorrelación
     const detection = detectFrequency(dataArray, state.audioContext.sampleRate);
     
     if (detection.valid) {
@@ -1292,7 +2032,7 @@ function analyzeAudioAfinador() {
     state.animationId = requestAnimationFrame(analyzeAudioAfinador);
 }
 
-// Función simplificada de detección de frecuencia
+// Función mejorada de detección de frecuencia por autocorrelación
 function detectFrequency(dataArray, sampleRate) {
     // Calcular energía de la señal
     let energy = 0;
@@ -1305,16 +2045,43 @@ function detectFrequency(dataArray, sampleRate) {
         return { valid: false, frequency: 0, strength: energy };
     }
     
-    // Para demostración: generar una frecuencia aleatoria cerca del objetivo
+    // Algoritmo básico de autocorrelación para detección de frecuencia
+    let bestR = 0;
+    let bestLag = 0;
+    
+    // Buscar periodicidad (solo en un rango razonable)
+    const minLag = Math.floor(sampleRate / STRINGS[state.currentString].range.high);
+    const maxLag = Math.floor(sampleRate / STRINGS[state.currentString].range.low);
+    
+    for (let lag = minLag; lag < maxLag && lag < dataArray.length / 2; lag++) {
+        let r = 0;
+        for (let i = 0; i < dataArray.length - lag; i++) {
+            r += dataArray[i] * dataArray[i + lag];
+        }
+        
+        if (r > bestR) {
+            bestR = r;
+            bestLag = lag;
+        }
+    }
+    
+    if (bestLag === 0 || bestR < 0.1) {
+        return { valid: false, frequency: 0, strength: energy };
+    }
+    
+    // Calcular frecuencia
+    const frequency = sampleRate / bestLag;
+    
+    // Verificar si está en el rango de la cuerda actual
     const string = STRINGS[state.currentString];
-    const randomOffset = (Math.random() - 0.5) * 20;
-    const simulatedFrequency = string.frequency + randomOffset;
-    const simulatedStrength = Math.min(energy * 10, 1);
+    if (frequency < string.range.low || frequency > string.range.high) {
+        return { valid: false, frequency: frequency, strength: energy };
+    }
     
     return { 
         valid: true, 
-        frequency: simulatedFrequency, 
-        strength: simulatedStrength 
+        frequency: frequency, 
+        strength: Math.min(energy * 10, 1) 
     };
 }
 
@@ -1404,7 +2171,7 @@ function updateDeviationDisplayAfinador(cents, string) {
     }
 }
 
-// ========== METRÓNOMO MEJORADO (MISMO CÓDIGO) ==========
+// ========== METRÓNOMO MEJORADO ==========
 // Variables del metrónomo
 let metronomo = {
     isPlaying: false,
@@ -1742,15 +2509,28 @@ function handleMetronomoKeyboardShortcuts(e) {
     }
 }
 
-// Funciones de administración
-window.manageUsers = function() {
-    alert('🔧 Redirigiendo a gestión de usuarios...');
-};
-
-window.manageContent = function() {
-    alert('📚 Redirigiendo a gestión de contenido...');
-};
-
-window.viewStatistics = function() {
-    alert('📊 Redirigiendo a estadísticas...');
-};
+// ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM cargado, inicializando aplicación optimizada...');
+    
+    // Inicializar Firebase optimizado
+    initializeFirebase();
+    
+    // Efecto de escritura en el hero
+    const heroText = document.querySelector('.hero h1');
+    if (heroText) {
+        const originalText = heroText.textContent;
+        heroText.textContent = '';
+        let i = 0;
+        
+        function typeWriter() {
+            if (i < originalText.length) {
+                heroText.textContent += originalText.charAt(i);
+                i++;
+                setTimeout(typeWriter, 50);
+            }
+        }
+        
+        setTimeout(typeWriter, 500);
+    }
+});
