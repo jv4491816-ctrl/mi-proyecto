@@ -21,6 +21,18 @@
     --strong-beat-color: #ea4335;      /* Rojo para tiempo fuerte */
     --weak-beat-color: #fbbc04;        /* Naranja para tiempo débil */
     --inactive-beat-color: #9aa0a6;    /* Gris para inactivo */
+    
+    /* Colores específicos para categorías del foro */
+    --category-tecnica: #4285f4;       /* Azul para técnica */
+    --category-equipos: #34a853;       /* Verde para equipos */
+    --category-aprendizaje: #fbbc04;   /* Naranja para aprendizaje */
+    --category-teoria: #9b59b6;        /* Púrpura para teoría */
+    --category-conciertos: #ea4335;    /* Rojo para conciertos */
+    
+    /* Estados de temas */
+    --status-new: #34a853;             /* Verde para temas nuevos */
+    --status-hot: #ea4335;             /* Rojo para temas populares */
+    --status-normal: #4285f4;          /* Azul para temas normales */
 }
 
 /* ========== ESTILOS GENERALES ========== */
@@ -1863,6 +1875,404 @@ footer {
     100% { opacity: 1; }
 }
 
+/* ========== ESTILOS PARA BADGE DE CATEGORÍA EN MENSAJES ========== */
+.message-category-badge {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.category-general {
+    background: rgba(66, 133, 244, 0.2);
+    color: var(--category-tecnica);
+}
+
+.category-tecnica {
+    background: rgba(66, 133, 244, 0.2);
+    color: var(--category-tecnica);
+}
+
+.category-consejo {
+    background: rgba(52, 168, 83, 0.2);
+    color: var(--category-equipos);
+}
+
+.category-anuncio {
+    background: rgba(251, 188, 4, 0.2);
+    color: var(--category-aprendizaje);
+}
+
+.category-mantenimiento {
+    background: rgba(155, 89, 182, 0.2);
+    color: var(--category-teoria);
+}
+
+/* ========== ESTADO DE SINCRONIZACIÓN ========== */
+.sync-connected {
+    color: var(--stage-2-color) !important;
+}
+
+.sync-disconnected {
+    color: var(--accent-red) !important;
+}
+
+.sync-connecting {
+    color: var(--stage-3-color) !important;
+}
+
+/* ========== INDICADOR DE NUEVO MENSAJE ========== */
+.new-message-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    animation: pulse 1.5s infinite;
+}
+
+/* ========== TIMESTAMP DE MENSAJE ========== */
+.message-timestamp {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ========== ESTILOS PARA MENSAJES DEL ADMIN ========== */
+
+/* Header de mensajes */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.header .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.header .logo i {
+    font-size: 2.5rem;
+    color: var(--primary-blue);
+    animation: float 3s ease-in-out infinite;
+}
+
+.header .logo h1 {
+    font-size: 2.5rem;
+    color: var(--text-white);
+}
+
+.header .logo span {
+    color: var(--primary-blue);
+}
+
+.header .subtitle {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Formulario de mensajes */
+.ask-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.ask-section h2 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: var(--text-white);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ask-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-white);
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Lista de mensajes */
+.questions-section {
+    margin-bottom: 40px;
+}
+
+.questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.question-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s;
+    position: relative;
+}
+
+.question-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-blue);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    gap: 15px;
+}
+
+.question-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-white);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.question-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.question-author {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.question-content {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+    margin-bottom: 15px;
+    font-size: 1.05rem;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Badge de admin */
+.admin-badge {
+    background: var(--primary-blue);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+/* Notificaciones */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+    background: var(--stage-2-color);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+    max-width: 400px;
+}
+
+.notification.success {
+    background: var(--stage-2-color);
+}
+
+.notification.error {
+    background: var(--accent-red);
+}
+
+.notification.info {
+    background: var(--primary-blue);
+}
+
+/* ========== BTN OUTLINE PEQUEÑO ========== */
+.btn-sm {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
+
+/* ========== CONTADORES ========== */
+.count-badge {
+    background: var(--primary-blue);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+/* ========== STATS CONTAINER ========== */
+.stats-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ========== ESTILOS PARA VALIDACIÓN DE CONTRASEÑA ========== */
+.password-strength {
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.strength-bar {
+    height: 5px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strength-weak { background: var(--accent-red); width: 20%; }
+.strength-medium { background: var(--stage-3-color); width: 50%; }
+.strength-good { background: #ffa726; width: 70%; }
+.strength-strong { background: var(--stage-2-color); width: 100%; }
+
+.password-rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+
+.password-rule {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.password-rule.valid {
+    color: var(--stage-2-color);
+}
+
+.password-rule.invalid {
+    color: var(--accent-red);
+}
+
+.password-match {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.password-match.valid {
+    color: var(--stage-2-color);
+}
+
+.password-match.invalid {
+    color: var(--accent-red);
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
     .nav-links {
@@ -2040,6 +2450,38 @@ footer {
     .users-table th {
         padding: 12px 15px;
     }
+    
+    /* Mensajes responsive */
+    .header .logo h1 {
+        font-size: 2rem;
+    }
+    
+    .header .subtitle {
+        font-size: 1rem;
+    }
+    
+    .ask-section,
+    .question-card {
+        padding: 20px 15px;
+    }
+    
+    .question-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .question-meta {
+        align-items: flex-start;
+    }
+    
+    .question-title {
+        font-size: 1.2rem;
+    }
+    
+    .message-category-badge {
+        margin-left: 0;
+        margin-top: 5px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -2094,6 +2536,10 @@ footer {
     
     .users-table {
         min-width: 500px;
+    }
+    
+    .question-title {
+        font-size: 1.1rem;
     }
 }
 

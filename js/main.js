@@ -33,6 +33,12 @@ function showPage(pageId) {
         initMetronomo();
     } else if (pageId === 'admin-panel-page') {
         initAdminPanel();
+    } else if (pageId === 'foro') {
+        // Inicializar mensajes si no están inicializados
+        if (!isMessagesInitialized) {
+            initMessages();
+            isMessagesInitialized = true;
+        }
     }
 }
 
@@ -54,7 +60,169 @@ menuToggle.addEventListener('click', function() {
 const initialPage = window.location.hash.substring(1) || 'index';
 showPage(initialPage);
 
-// ========== SISTEMA DE AUTENTICACIÓN FIREBASE MODULAR OPTIMIZADO ==========
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(message, type = 'info') {
+    // Remover notificación anterior si existe
+    const oldNotification = document.querySelector('.notification');
+    if (oldNotification) {
+        oldNotification.remove();
+    }
+    
+    // Crear notificación
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-eliminar después de 3 segundos
+    setTimeout(() => {
+        notification.style.animation = 'fadeIn 0.3s ease reverse';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// ========== FUNCIONES DE VALIDACIÓN DE CONTRASEÑA ==========
+
+// Función para validar la fortaleza de la contraseña
+function validatePasswordStrength() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const strengthBar = document.getElementById('strengthBar');
+    const passwordRules = {
+        length: document.getElementById('ruleLength'),
+        upper: document.getElementById('ruleUpper'),
+        lower: document.getElementById('ruleLower'),
+        number: document.getElementById('ruleNumber'),
+        symbol: document.getElementById('ruleSymbol')
+    };
+    
+    if (!password) {
+        // Resetear todo si no hay contraseña
+        Object.values(passwordRules).forEach(rule => {
+            if (rule) rule.style.color = 'var(--accent-red)';
+        });
+        if (strengthBar) strengthBar.style.width = '0%';
+        return false;
+    }
+    
+    // Validaciones individuales
+    const rules = {
+        length: password.length >= 8,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+    
+    // Actualizar colores de las reglas
+    Object.keys(rules).forEach(key => {
+        const ruleElement = passwordRules[key];
+        if (ruleElement) {
+            ruleElement.style.color = rules[key] ? 'var(--stage-2-color)' : 'var(--accent-red)';
+        }
+    });
+    
+    // Calcular fortaleza (0-100%)
+    const validRules = Object.values(rules).filter(Boolean).length;
+    const strength = (validRules / 5) * 100;
+    
+    // Actualizar barra de fortaleza
+    if (strengthBar) {
+        strengthBar.style.width = `${strength}%`;
+        if (strength < 40) {
+            strengthBar.style.backgroundColor = 'var(--accent-red)';
+        } else if (strength < 80) {
+            strengthBar.style.backgroundColor = 'var(--stage-3-color)';
+        } else {
+            strengthBar.style.backgroundColor = 'var(--stage-2-color)';
+        }
+    }
+    
+    return validRules === 5; // Todas las reglas cumplidas
+}
+
+// Función para validar que las contraseñas coincidan
+function validatePasswordMatch() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value || '';
+    const matchStatus = document.getElementById('matchStatus');
+    const confirmError = document.getElementById('modalSignupConfirmPasswordError');
+    
+    if (!matchStatus) return false;
+    
+    if (!confirmPassword) {
+        matchStatus.textContent = '✓ Las contraseñas coinciden';
+        matchStatus.style.color = 'var(--accent-red)';
+        if (confirmError) confirmError.textContent = '';
+        return false;
+    }
+    
+    const passwordsMatch = password === confirmPassword;
+    
+    if (passwordsMatch) {
+        matchStatus.textContent = '✓ Las contraseñas coinciden';
+        matchStatus.style.color = 'var(--stage-2-color)';
+        if (confirmError) confirmError.textContent = '';
+    } else {
+        matchStatus.textContent = '✗ Las contraseñas no coinciden';
+        matchStatus.style.color = 'var(--accent-red)';
+        if (confirmError) confirmError.textContent = 'Las contraseñas no coinciden';
+    }
+    
+    return passwordsMatch;
+}
+
+// Función para validar toda la contraseña (fortaleza + coincidencia)
+function validateCompletePassword() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value || '';
+    const passwordError = document.getElementById('modalSignupPasswordError');
+    const confirmError = document.getElementById('modalSignupConfirmPasswordError');
+    
+    // Resetear errores
+    if (passwordError) passwordError.textContent = '';
+    if (confirmError) confirmError.textContent = '';
+    
+    // Validar longitud mínima
+    if (password.length < 8) {
+        if (passwordError) passwordError.textContent = 'La contraseña debe tener al menos 8 caracteres';
+        return false;
+    }
+    
+    // Validar reglas de complejidad
+    const rules = {
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+    
+    const missingRules = [];
+    if (!rules.upper) missingRules.push('mayúscula');
+    if (!rules.lower) missingRules.push('minúscula');
+    if (!rules.number) missingRules.push('número');
+    if (!rules.symbol) missingRules.push('símbolo');
+    
+    if (missingRules.length > 0) {
+        if (passwordError) {
+            passwordError.textContent = `Falta: ${missingRules.join(', ')}`;
+        }
+        return false;
+    }
+    
+    // Validar coincidencia
+    if (password !== confirmPassword) {
+        if (confirmError) confirmError.textContent = 'Las contraseñas no coinciden';
+        return false;
+    }
+    
+    return true;
+}
+
+// ========== SISTEMA DE AUTENTICACIÓN FIREBASE MODULAR ==========
 const loginModal = document.getElementById('loginModal');
 const modalFormSection = document.getElementById('modalFormSection');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
@@ -80,7 +248,7 @@ const ADMIN_EMAILS = [
     'admin@demo.com'
 ];
 
-// ========== SISTEMA DE ESTADO DE FIREBASE OPTIMIZADO ==========
+// ========== SISTEMA DE ESTADO DE FIREBASE ==========
 const firebaseState = {
     available: false,
     auth: null,
@@ -91,11 +259,10 @@ const firebaseState = {
     maxRetries: 2
 };
 
-// Función única para actualizar estado de Firebase
+// Función para actualizar estado de Firebase
 function updateFirebaseState() {
     const previousState = firebaseState.available;
     
-    // Verificar disponibilidad una sola vez
     const isAvailable = Boolean(
         window.firebaseReady && 
         window.firebaseAuth && 
@@ -108,7 +275,7 @@ function updateFirebaseState() {
         firebaseState.auth = window.firebaseAuth;
         firebaseState.db = window.firebaseDb;
         firebaseState.modules = window.firebaseModules;
-        firebaseState.retryAttempts = 0; // Resetear intentos si funciona
+        firebaseState.retryAttempts = 0;
         console.log("✅ Firebase Modular disponible");
     } else {
         firebaseState.auth = null;
@@ -119,7 +286,6 @@ function updateFirebaseState() {
     
     firebaseState.lastChecked = Date.now();
     
-    // Log solo si cambió el estado
     if (previousState !== firebaseState.available) {
         console.log(`Firebase: ${previousState ? 'ON' : 'OFF'} → ${firebaseState.available ? 'ON' : 'OFF'}`);
     }
@@ -127,9 +293,8 @@ function updateFirebaseState() {
     return firebaseState.available;
 }
 
-// Helper para usar Firebase de forma segura y optimizada
+// Helper para usar Firebase de forma segura
 function useFirebase() {
-    // Solo verificar si ha pasado más de 10 segundos desde la última verificación
     const shouldCheck = !firebaseState.lastChecked || 
                        (Date.now() - firebaseState.lastChecked) > 10000;
     
@@ -143,7 +308,6 @@ function useFirebase() {
         db: firebaseState.db,
         modules: firebaseState.modules,
         
-        // Método seguro para operaciones Firebase
         async safeOperation(operationName, operation, fallback) {
             if (!firebaseState.available) {
                 console.warn(`Firebase no disponible para: ${operationName}`);
@@ -156,7 +320,6 @@ function useFirebase() {
             } catch (error) {
                 console.error(`Error en ${operationName}:`, error.code || error.message);
                 
-                // Si es error de red, marcar Firebase como no disponible temporalmente
                 if (error.code?.includes('network') || error.code?.includes('unavailable')) {
                     firebaseState.available = false;
                     firebaseState.lastChecked = Date.now();
@@ -170,12 +333,10 @@ function useFirebase() {
 
 // Verificar si un usuario es administrador
 async function checkIfUserIsAdmin(email) {
-    // Primero verificar en la lista local de emails admin
     if (ADMIN_EMAILS.includes(email.toLowerCase())) {
         return true;
     }
     
-    // Si Firebase está disponible, verificar en Firestore
     const firebase = useFirebase();
     
     return await firebase.safeOperation(
@@ -186,7 +347,7 @@ async function checkIfUserIsAdmin(email) {
             );
             return adminDoc.exists();
         },
-        false // Fallback: no es admin
+        false
     );
 }
 
@@ -200,11 +361,9 @@ async function saveUserToFirestore(user) {
             const userRef = firebase.modules.doc(firebase.db, 'users', user.uid);
             const userSnap = await firebase.modules.getDoc(userRef);
             
-            // Verificar si es admin
             const isAdmin = await checkIfUserIsAdmin(user.email);
             
             if (!userSnap.exists()) {
-                // Crear nuevo usuario
                 await firebase.modules.setDoc(userRef, {
                     uid: user.uid,
                     email: user.email,
@@ -222,7 +381,6 @@ async function saveUserToFirestore(user) {
                 });
                 console.log("✅ Usuario creado en Firestore:", user.uid);
             } else {
-                // Actualizar último login
                 await firebase.modules.updateDoc(userRef, {
                     lastLogin: firebase.modules.serverTimestamp()
                 });
@@ -230,15 +388,14 @@ async function saveUserToFirestore(user) {
             }
             return true;
         },
-        false // Fallback: no se guardó en Firestore
+        false
     );
 }
 
-// Inicializar Firebase optimizado
+// Inicializar Firebase
 function initializeFirebase() {
-    console.log("🎯 Inicializando Firebase optimizado...");
+    console.log("🎯 Inicializando Firebase...");
     
-    // Una sola verificación inicial
     updateFirebaseState();
     
     if (firebaseState.available) {
@@ -248,10 +405,9 @@ function initializeFirebase() {
         console.log("⚠️ Firebase no disponible, usando modo local");
         loadUserFromStorage();
         
-        // Un solo reintento inteligente
         if (firebaseState.retryAttempts < firebaseState.maxRetries) {
             firebaseState.retryAttempts++;
-            const retryDelay = firebaseState.retryAttempts * 2000; // 2s, 4s
+            const retryDelay = firebaseState.retryAttempts * 2000;
             
             console.log(`Reintento ${firebaseState.retryAttempts} en ${retryDelay}ms...`);
             
@@ -263,7 +419,6 @@ function initializeFirebase() {
         }
     }
     
-    // Detectar cambios en la conexión
     setupConnectionListeners();
 }
 
@@ -283,7 +438,9 @@ function setupConnectionListeners() {
     });
 }
 
-// Configurar observador de autenticación optimizado
+// ========== SISTEMA DE SINCRONIZACIÓN EN TIEMPO REAL ==========
+
+// Configurar observador de autenticación y sincronización
 function setupAuthObserver() {
     const firebase = useFirebase();
     
@@ -293,19 +450,27 @@ function setupAuthObserver() {
     }
     
     try {
-        console.log("👁️ Configurando observador de autenticación optimizado...");
+        console.log("👁️ Configurando observador de autenticación y sincronización...");
         
         firebase.modules.onAuthStateChanged(firebase.auth, async (user) => {
             console.log("🔄 Cambio en estado de autenticación:", user ? `Usuario: ${user.email}` : "Sin usuario");
             
             if (user) {
-                // Guardar usuario en Firestore de forma segura
+                // Guardar/Actualizar usuario en Firestore
                 await saveUserToFirestore(user);
-                handleFirebaseUser(user);
+                
+                // Manejar usuario y configurar sincronización en tiempo real
+                await handleFirebaseUser(user);
+                
+                // Configurar listener en tiempo real para cambios en el documento del usuario
+                setupUserRealtimeListener(user.uid);
             } else {
                 currentUser = null;
                 localStorage.removeItem('guitarraFacilUser');
                 updateUIForUser(null);
+                
+                // Limpiar listener de sincronización
+                cleanupRealtimeListeners();
             }
         });
         
@@ -317,11 +482,173 @@ function setupAuthObserver() {
     }
 }
 
-// Manejar usuario de Firebase optimizado
+// Configurar listener en tiempo real para cambios en el usuario
+let userListenerUnsubscribe = null;
+
+function setupUserRealtimeListener(userId) {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable || !firebase.db) {
+        console.log("📴 Modo offline - no se puede configurar listener en tiempo real");
+        return;
+    }
+    
+    try {
+        // Referencia al documento del usuario en Firestore
+        const userDocRef = firebase.modules.doc(firebase.db, 'users', userId);
+        
+        // Configurar listener en tiempo real
+        userListenerUnsubscribe = firebase.modules.onSnapshot(userDocRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const userData = docSnapshot.data();
+                console.log("🔄 Cambios detectados en usuario:", userData.email);
+                
+                // Actualizar usuario local con los nuevos datos
+                updateLocalUserWithFirestoreData(userData);
+                
+                // Actualizar la interfaz de usuario
+                updateUIWithRealTimeData(userData);
+                
+                // Mostrar notificación si hay cambios importantes
+                notifyUserChanges(userData);
+            }
+        }, (error) => {
+            console.error("❌ Error en listener de usuario en tiempo real:", error);
+        });
+        
+        console.log("✅ Listener en tiempo real configurado para usuario:", userId);
+        
+    } catch (error) {
+        console.error("❌ Error configurando listener en tiempo real:", error);
+    }
+}
+
+// Limpiar listeners de sincronización
+function cleanupRealtimeListeners() {
+    if (userListenerUnsubscribe) {
+        userListenerUnsubscribe();
+        userListenerUnsubscribe = null;
+        console.log("🧹 Listener de usuario en tiempo real limpiado");
+    }
+}
+
+// Actualizar usuario local con datos de Firestore
+function updateLocalUserWithFirestoreData(userData) {
+    // Guardar en localStorage
+    const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
+    
+    const updatedUser = {
+        ...savedUser,
+        ...userData,
+        // Mantener propiedades que no están en Firestore
+        isFirebaseUser: savedUser.isFirebaseUser !== undefined ? savedUser.isFirebaseUser : true,
+        firstName: userData.displayName ? userData.displayName.split(' ')[0] : savedUser.firstName,
+        name: userData.displayName || savedUser.name,
+        email: userData.email || savedUser.email,
+        role: userData.role || savedUser.role,
+        progress: userData.progress || savedUser.progress
+    };
+    
+    // Actualizar fecha de createdAt si existe
+    if (userData.createdAt && userData.createdAt.toDate) {
+        updatedUser.createdAt = userData.createdAt.toDate().toISOString();
+    }
+    
+    // Actualizar fecha de lastLogin si existe
+    if (userData.lastLogin && userData.lastLogin.toDate) {
+        updatedUser.lastLogin = userData.lastLogin.toDate().toISOString();
+    }
+    
+    localStorage.setItem('guitarraFacilUser', JSON.stringify(updatedUser));
+    currentUser = updatedUser;
+    
+    console.log("📱 Usuario local actualizado desde Firestore");
+}
+
+// Actualizar interfaz con datos en tiempo real
+function updateUIWithRealTimeData(userData) {
+    // Actualizar nombre en la barra de navegación
+    const userNameElement = document.getElementById('user-name');
+    if (userNameElement && userData.displayName) {
+        const firstName = userData.displayName.split(' ')[0];
+        if (userNameElement.textContent !== firstName) {
+            userNameElement.textContent = firstName;
+            console.log("👤 Nombre actualizado en tiempo real:", firstName);
+        }
+    }
+    
+    // Actualizar avatar si hay photoURL
+    if (userData.photoURL && userAvatar) {
+        userAvatar.src = userData.photoURL;
+        userAvatar.style.display = 'block';
+        const avatarContainer = document.getElementById('user-avatar-container');
+        if (avatarContainer && !avatarContainer.querySelector('img')) {
+            avatarContainer.innerHTML = '';
+            avatarContainer.appendChild(userAvatar);
+        }
+    }
+    
+    // Actualizar mensajes de bienvenida
+    const updates = [
+        { id: 'user-name', value: userData.displayName?.split(' ')[0] || '' },
+        { id: 'admin-welcome-name', value: userData.displayName || '' },
+        { id: 'student-welcome-name', value: userData.displayName?.split(' ')[0] || '' },
+        { id: 'admin-username', value: userData.displayName || '' },
+        { id: 'admin-email', value: userData.email || '' }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element && element.textContent !== update.value) {
+            element.textContent = update.value;
+        }
+    });
+    
+    // Actualizar progreso del estudiante si existe
+    if (userData.progress) {
+        const progressUpdates = [
+            { id: 'student-level', value: userData.progress.level || 1 },
+            { id: 'student-progress', value: `${userData.progress.percentage || 0}%` },
+            { id: 'student-lessons', value: userData.progress.lessons || 0 }
+        ];
+        
+        progressUpdates.forEach(update => {
+            const element = document.getElementById(update.id);
+            if (element && element.textContent !== String(update.value)) {
+                element.textContent = update.value;
+            }
+        });
+    }
+    
+    // Actualizar visibilidad de admin
+    const isAdmin = userData.role === 'admin';
+    uiUpdater.updateAdminVisibility(isAdmin);
+}
+
+// Notificar al usuario sobre cambios importantes
+function notifyUserChanges(userData) {
+    const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
+    
+    // Notificar cambio de rol
+    if (savedUser.role !== userData.role) {
+        const roleMessage = userData.role === 'admin' ? 
+            '¡Ahora eres administrador!' : 'Tu rol ha cambiado a estudiante';
+        showNotification(`🔄 ${roleMessage}`, 'info');
+    }
+    
+    // Notificar progreso significativo
+    if (userData.progress && savedUser.progress) {
+        const progressDiff = (userData.progress.percentage || 0) - (savedUser.progress.percentage || 0);
+        if (progressDiff >= 10) {
+            showNotification(`🎉 ¡Progreso actualizado! Ahora estás al ${userData.progress.percentage}%`, 'success');
+        }
+    }
+}
+
+// Manejar usuario de Firebase
 async function handleFirebaseUser(user) {
     console.log("👤 Procesando usuario de Firebase:", user.email);
     
-    // Determinar rol (verificar si es admin)
     const isAdmin = await checkIfUserIsAdmin(user.email);
     
     currentUser = {
@@ -336,17 +663,13 @@ async function handleFirebaseUser(user) {
         provider: user.providerData?.[0]?.providerId || 'email'
     };
     
-    // Formatear nombre
     if (!user.displayName && user.email) {
         const nameFromEmail = user.email.split('@')[0];
         currentUser.name = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
         currentUser.firstName = currentUser.name.split(' ')[0];
     }
     
-    // Guardar en localStorage
     localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
-    
-    // Actualizar UI
     updateUIForUser(currentUser);
     
     console.log("✅ Usuario procesado:", currentUser.firstName, "Rol:", currentUser.role);
@@ -358,7 +681,6 @@ function loadUserFromStorage() {
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
         
-        // Asegurarse de que existe firstName
         if (!currentUser.firstName && currentUser.name) {
             currentUser.firstName = currentUser.name.split(' ')[0];
         }
@@ -368,7 +690,7 @@ function loadUserFromStorage() {
     }
 }
 
-// UI Updater optimizado
+// UI Updater
 const uiUpdater = {
     updateUserInfo(user) {
         if (!user) {
@@ -432,7 +754,6 @@ const uiUpdater = {
             adminNavItem.style.display = isAdmin ? 'block' : 'none';
         }
         
-        // Mostrar/ocultar contenido específico
         const studentElements = document.querySelectorAll('.student-only');
         const adminElements = document.querySelectorAll('.admin-only');
         
@@ -446,17 +767,14 @@ const uiUpdater = {
     }
 };
 
-// Actualizar UI según usuario optimizado
+// Actualizar UI según usuario
 async function updateUIForUser(user) {
     if (user) {
-        // Actualizar información básica
         uiUpdater.updateUserInfo(user);
         
-        // Verificar si es admin
         const isAdmin = await checkIfUserIsAdmin(user.email);
         uiUpdater.updateAdminVisibility(isAdmin);
         
-        // Actualizar estadísticas del estudiante si no es admin
         if (!isAdmin) {
             updateStudentStats();
         }
@@ -464,7 +782,6 @@ async function updateUIForUser(user) {
         uiUpdater.updateUserInfo(null);
         uiUpdater.updateAdminVisibility(false);
         
-        // Ocultar todo el contenido específico
         document.querySelectorAll('.student-only, .admin-only').forEach(el => {
             el.style.display = 'none';
         });
@@ -492,7 +809,6 @@ function updateStudentStats() {
 function handleLocalLogin(email, password) {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            // Credenciales de demostración
             const demoCredentials = [
                 { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
                 { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
@@ -524,7 +840,6 @@ function handleLocalLogin(email, password) {
 function handleLocalSignup(name, email, password) {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            // Verificar si es admin
             const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
             
             currentUser = {
@@ -635,12 +950,47 @@ function loadForm(formType) {
                     <label for="modalSignupPassword">Contraseña</label>
                     <div class="modal-input-with-icon" id="modalSignupPasswordContainer">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="modalSignupPassword" placeholder="Crea una contraseña segura (mínimo 6 caracteres)" required>
-                        <button type="button" id="toggleSignupPasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
+                        <input type="password" id="modalSignupPassword" 
+                               placeholder="Crea una contraseña segura (mínimo 8 caracteres)" 
+                               required 
+                               oninput="validatePasswordStrength()">
+                        <button type="button" id="toggleSignupPasswordBtn" 
+                                style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
+                    <div id="passwordStrength" style="margin-top: 5px; font-size: 0.8rem;">
+                        <div id="passwordRules">
+                            <div id="ruleLength" style="color: var(--accent-red);">✓ Mínimo 8 caracteres</div>
+                            <div id="ruleUpper" style="color: var(--accent-red);">✓ 1 mayúscula</div>
+                            <div id="ruleLower" style="color: var(--accent-red);">✓ 1 minúscula</div>
+                            <div id="ruleNumber" style="color: var(--accent-red);">✓ 1 número</div>
+                            <div id="ruleSymbol" style="color: var(--accent-red);">✓ 1 símbolo</div>
+                        </div>
+                        <div id="passwordStrengthBar" style="height: 4px; background: #ccc; margin-top: 5px; border-radius: 2px; overflow: hidden;">
+                            <div id="strengthBar" style="height: 100%; width: 0%; background: var(--accent-red); transition: width 0.3s;"></div>
+                        </div>
+                    </div>
                     <span class="error-message" id="modalSignupPasswordError"></span>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modalSignupConfirmPassword">Confirmar Contraseña</label>
+                    <div class="modal-input-with-icon" id="modalSignupConfirmPasswordContainer">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="modalSignupConfirmPassword" 
+                               placeholder="Confirma tu contraseña" 
+                               required
+                               oninput="validatePasswordMatch()">
+                        <button type="button" id="toggleConfirmPasswordBtn" 
+                                style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div id="passwordMatch" style="margin-top: 5px; font-size: 0.8rem;">
+                        <div id="matchStatus" style="color: var(--accent-red);">✓ Las contraseñas coinciden</div>
+                    </div>
+                    <span class="error-message" id="modalSignupConfirmPasswordError"></span>
                 </div>
                 
                 <button type="submit" id="modalSignupSubmitBtn" class="modal-submit-btn">
@@ -682,7 +1032,6 @@ function setupFormEvents() {
         const googleLoginBtn = document.getElementById('googleLoginBtn');
         const githubLoginBtn = document.getElementById('githubLoginBtn');
         
-        // Toggle password visibility
         if (togglePasswordBtn && passwordInput) {
             togglePasswordBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -691,7 +1040,6 @@ function setupFormEvents() {
             });
         }
         
-        // Switch to signup
         if (switchToSignup) {
             switchToSignup.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -700,7 +1048,6 @@ function setupFormEvents() {
             });
         }
         
-        // Forgot password
         if (forgotPassword) {
             forgotPassword.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -708,7 +1055,6 @@ function setupFormEvents() {
             });
         }
         
-        // Google Login
         if (googleLoginBtn) {
             googleLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -716,7 +1062,6 @@ function setupFormEvents() {
             });
         }
         
-        // GitHub Login
         if (githubLoginBtn) {
             githubLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -724,7 +1069,6 @@ function setupFormEvents() {
             });
         }
         
-        // Login form submission
         if (loginForm) {
             loginForm.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -734,12 +1078,14 @@ function setupFormEvents() {
     } else {
         const signupForm = document.getElementById('modalSignupForm');
         const passwordInput = document.getElementById('modalSignupPassword');
+        const confirmPasswordInput = document.getElementById('modalSignupConfirmPassword');
         const togglePasswordBtn = document.getElementById('toggleSignupPasswordBtn');
+        const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPasswordBtn');
         const switchToLogin = document.getElementById('modalSwitchToLogin');
         const googleSignupBtn = document.getElementById('googleSignupBtn');
         const githubSignupBtn = document.getElementById('githubSignupBtn');
         
-        // Toggle password visibility
+        // Toggle para mostrar/ocultar contraseña principal
         if (togglePasswordBtn && passwordInput) {
             togglePasswordBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -748,7 +1094,24 @@ function setupFormEvents() {
             });
         }
         
-        // Switch to login
+        // Toggle para mostrar/ocultar confirmación de contraseña
+        if (toggleConfirmPasswordBtn && confirmPasswordInput) {
+            toggleConfirmPasswordBtn.addEventListener('click', function() {
+                const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                confirmPasswordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
+        }
+        
+        // Validación en tiempo real de contraseña
+        if (passwordInput) {
+            passwordInput.addEventListener('input', validatePasswordStrength);
+        }
+        
+        if (confirmPasswordInput) {
+            confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+        }
+        
         if (switchToLogin) {
             switchToLogin.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -757,7 +1120,6 @@ function setupFormEvents() {
             });
         }
         
-        // Google Signup
         if (googleSignupBtn) {
             googleSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -765,7 +1127,6 @@ function setupFormEvents() {
             });
         }
         
-        // GitHub Signup
         if (githubSignupBtn) {
             githubSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -773,7 +1134,6 @@ function setupFormEvents() {
             });
         }
         
-        // Signup form submission
         if (signupForm) {
             signupForm.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -783,7 +1143,7 @@ function setupFormEvents() {
     }
 }
 
-// Manejar login con redes sociales optimizado
+// Manejar login con redes sociales
 async function handleSocialLogin(providerType) {
     const firebase = useFirebase();
     const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
@@ -796,7 +1156,6 @@ async function handleSocialLogin(providerType) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Conectando con ${providerType === 'google' ? 'Google' : 'GitHub'}...`;
     
-    // Si Firebase no está disponible
     if (!firebase.isAvailable) {
         submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
         submitBtn.classList.add('error-btn');
@@ -805,7 +1164,7 @@ async function handleSocialLogin(providerType) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert('Firebase no está disponible. Por favor, usa el registro por email.');
+            showNotification('Firebase no está disponible. Por favor, usa el registro por email.', 'error');
         }, 1000);
         return;
     }
@@ -853,12 +1212,12 @@ async function handleSocialLogin(providerType) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage);
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar login optimizado
+// Manejar login
 async function handleLogin() {
     const email = document.getElementById('modalEmail')?.value.trim();
     const password = document.getElementById('modalPassword')?.value;
@@ -866,19 +1225,16 @@ async function handleLogin() {
     
     if (!submitBtn) return;
     
-    // Validaciones básicas
     if (!email || !password) {
-        alert('Por favor, completa todos los campos');
+        showNotification('Por favor, completa todos los campos', 'error');
         return;
     }
     
-    // Validar formato de email
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert('Por favor, ingresa un email válido');
+        showNotification('Por favor, ingresa un email válido', 'error');
         return;
     }
     
-    // Actualizar UI del botón
     const originalContent = submitBtn.innerHTML;
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
@@ -887,7 +1243,6 @@ async function handleLogin() {
         const firebase = useFirebase();
         
         if (firebase.isAvailable) {
-            // Intentar login con Firebase
             await firebase.safeOperation(
                 'login',
                 async () => {
@@ -897,7 +1252,6 @@ async function handleLogin() {
                     return userCredential.user;
                 },
                 async () => {
-                    // Fallback a login local
                     return await handleLocalLogin(email, password);
                 }
             );
@@ -910,7 +1264,6 @@ async function handleLogin() {
             }, 1000);
             
         } else {
-            // Usar login local directamente
             await handleLocalLogin(email, password);
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
@@ -938,42 +1291,40 @@ async function handleLogin() {
         
         errorMessage = errorMessages[error.message] || errorMessages[error.code] || errorMessage;
         
-        // Mostrar usuarios demo disponibles
-        if (errorMessage.includes('incorrectos')) {
-            errorMessage += '\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• jv4491816@gmail.com / 123456\n• fraylingay@gmail.com / 123456\n• usuario@demo.com / 123456';
-        }
-        
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage);
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar registro optimizado
+// Manejar registro
 async function handleSignup() {
     const name = document.getElementById('modalSignupName')?.value.trim();
     const email = document.getElementById('modalSignupEmail')?.value.trim();
     const password = document.getElementById('modalSignupPassword')?.value;
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value;
     const submitBtn = document.getElementById('modalSignupSubmitBtn');
     
     if (!submitBtn) return;
     
-    // Validaciones básicas
-    if (!name || !email || !password) {
-        alert('Por favor, completa todos los campos');
+    // Validar campos requeridos
+    if (!name || !email || !password || !confirmPassword) {
+        showNotification('Por favor, completa todos los campos', 'error');
         return;
     }
     
-    if (password.length < 6) {
-        alert('La contraseña debe tener al menos 6 caracteres');
-        return;
-    }
-    
+    // Validar email
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert('Por favor, ingresa un email válido');
+        showNotification('Por favor, ingresa un email válido', 'error');
+        return;
+    }
+    
+    // Validar contraseña completa
+    if (!validateCompletePassword()) {
+        showNotification('Por favor, corrige los errores en la contraseña', 'error');
         return;
     }
     
@@ -985,7 +1336,6 @@ async function handleSignup() {
         const firebase = useFirebase();
         
         if (firebase.isAvailable) {
-            // Crear usuario en Firebase
             await firebase.safeOperation(
                 'signup',
                 async () => {
@@ -994,16 +1344,12 @@ async function handleSignup() {
                     );
                     const user = userCredential.user;
                     
-                    // Actualizar nombre en perfil
                     await firebase.modules.updateProfile(user, { displayName: name });
-                    
-                    // Enviar email de verificación
                     await firebase.modules.sendEmailVerification(user);
                     
                     return user;
                 },
                 async () => {
-                    // Fallback a registro local
                     return await handleLocalSignup(name, email, password);
                 }
             );
@@ -1013,11 +1359,10 @@ async function handleSignup() {
             
             setTimeout(() => {
                 closeModal();
-                alert(`¡Bienvenido ${name.split(' ')[0]}! 🎸\n\nCuenta creada exitosamente en Firebase.\n\nHemos enviado un email de verificación a:\n${email}\n\nPor favor verifica tu email.`);
+                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente. Hemos enviado un email de verificación.`, 'success');
             }, 1500);
             
         } else {
-            // Usar registro local directamente
             await handleLocalSignup(name, email, password);
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
@@ -1028,7 +1373,7 @@ async function handleSignup() {
             
             setTimeout(() => {
                 closeModal();
-                alert(`¡Bienvenido ${name.split(' ')[0]}! 🎸\n\nCuenta creada exitosamente en modo local.\n\nEmail: ${email}\nRol: ${roleMsg}`);
+                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente en modo local.\nEmail: ${email}\nRol: ${roleMsg}`, 'success');
             }, 1000);
         }
         
@@ -1043,7 +1388,7 @@ async function handleSignup() {
         const errorMessages = {
             'auth/email-already-in-use': 'Este email ya está registrado',
             'auth/invalid-email': 'Email inválido',
-            'auth/weak-password': 'Contraseña muy débil (mínimo 6 caracteres)',
+            'auth/weak-password': 'Contraseña muy débil. Debe tener al menos 8 caracteres con mayúsculas, minúsculas, números y símbolos.',
             'auth/operation-not-allowed': 'El registro con email/contraseña no está habilitado'
         };
         
@@ -1053,19 +1398,19 @@ async function handleSignup() {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage + (error.code ? '\n\nCódigo: ' + error.code : ''));
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar "Olvidé mi contraseña" optimizado
+// Manejar "Olvidé mi contraseña"
 async function handleForgotPassword() {
     const email = prompt('Por favor, ingresa tu email para recuperar tu contraseña:');
     
     if (!email) return;
     
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert('Por favor, ingresa un email válido.');
+        showNotification('Por favor, ingresa un email válido.', 'error');
         return;
     }
     
@@ -1082,10 +1427,10 @@ async function handleForgotPassword() {
                 false
             );
             
-            alert(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`);
+            showNotification(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`, 'success');
             
         } else {
-            alert(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}\n\nUsuarios demo disponibles:\n• estudiante@demo.com\n• admin@demo.com\n• jv4491816@gmail.com\n• fraylingay@gmail.com\n• usuario@demo.com`);
+            showNotification(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}`, 'info');
         }
         
     } catch (error) {
@@ -1097,16 +1442,18 @@ async function handleForgotPassword() {
         };
         
         const errorMessage = errorMessages[error.code] || error.message || 'Error al enviar el email';
-        alert(`Error: ${errorMessage}`);
+        showNotification(`Error: ${errorMessage}`, 'error');
     }
 }
 
-// Manejar logout optimizado
+// Manejar logout
 async function handleLogout() {
     try {
         const firebase = useFirebase();
         
-        // Cerrar sesión en Firebase si está disponible
+        // Limpiar listeners de sincronización
+        cleanupRealtimeListeners();
+        
         if (firebase.isAvailable) {
             await firebase.safeOperation(
                 'logout',
@@ -1118,16 +1465,15 @@ async function handleLogout() {
             );
         }
         
-        // Limpiar datos locales
         currentUser = null;
         localStorage.removeItem('guitarraFacilUser');
         updateUIForUser(null);
         
-        alert('Sesión cerrada exitosamente. ¡Hasta pronto! 🎸');
+        showNotification('Sesión cerrada exitosamente. ¡Hasta pronto! 🎸', 'success');
         
     } catch (error) {
         console.error('Error al cerrar sesión:', error);
-        alert('Error al cerrar sesión. Intenta de nuevo.');
+        showNotification('Error al cerrar sesión. Intenta de nuevo.', 'error');
     }
 }
 
@@ -1145,7 +1491,7 @@ function closeModal() {
     document.body.style.overflow = 'auto';
 }
 
-// Event Listeners
+// Event Listeners de autenticación
 if (loginBtn) {
     loginBtn.addEventListener('click', () => openModal('login'));
 }
@@ -1174,11 +1520,592 @@ if (loginModal) {
     });
 }
 
-// ========== PANEL DE ADMINISTRACIÓN OPTIMIZADO ==========
+// ========== SISTEMA DE MENSAJES DEL ADMIN CON FIRESTORE ==========
+
+// Estado de los mensajes
+let adminMessages = [];
+let messagesUnsubscribe = null;
+let isMessagesInitialized = false;
+
+// Colección de Firestore para mensajes
+const MESSAGES_COLLECTION = 'adminMessages';
+
+// Elementos del DOM de mensajes
+const askForm = document.getElementById('askForm');
+const messagesList = document.getElementById('messagesList');
+const emptyState = document.getElementById('emptyState');
+
+// Función para obtener la referencia a la colección de mensajes
+function getMessagesCollection() {
+    const firebase = useFirebase();
+    if (!firebase.isAvailable || !firebase.db) return null;
+    return firebase.modules.collection(firebase.db, MESSAGES_COLLECTION);
+}
+
+// Función para inicializar la sincronización de mensajes en tiempo real
+async function initMessagesSync() {
+    const firebase = useFirebase();
+    const syncStatus = document.getElementById('syncStatus');
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - usar localStorage
+        console.log('📴 Modo offline para mensajes');
+        if (syncStatus) {
+            syncStatus.innerHTML = '<i class="fas fa-circle sync-disconnected"></i> <span>Modo offline</span>';
+        }
+        loadMessagesFromLocalStorage();
+        return;
+    }
+    
+    const messagesCollection = getMessagesCollection();
+    if (!messagesCollection) {
+        console.error('❌ No se pudo obtener la colección de mensajes');
+        return;
+    }
+    
+    try {
+        // Ordenar por fecha de creación (más reciente primero)
+        const q = firebase.modules.query(
+            messagesCollection,
+            firebase.modules.orderBy('createdAt', 'desc')
+        );
+        
+        // Configurar listener en tiempo real
+        messagesUnsubscribe = firebase.modules.onSnapshot(q, (snapshot) => {
+            adminMessages = [];
+            snapshot.forEach((doc) => {
+                const messageData = doc.data();
+                adminMessages.push({
+                    id: doc.id,
+                    ...messageData,
+                    // Convertir Firestore Timestamp a Date si existe
+                    createdAt: messageData.createdAt?.toDate?.() || new Date(messageData.createdAt),
+                    updatedAt: messageData.updatedAt?.toDate?.() || null
+                });
+            });
+            
+            // Actualizar UI
+            updateSyncStatus(true);
+            displayMessages();
+            updateMessageCount();
+            saveMessagesToLocalStorage();
+            
+            console.log(`✅ ${adminMessages.length} mensajes sincronizados`);
+        });
+        
+        console.log('🔗 Listener de mensajes configurado en tiempo real');
+        
+    } catch (error) {
+        console.error('❌ Error configurando listener de mensajes:', error);
+        updateSyncStatus(false);
+        loadMessagesFromLocalStorage();
+    }
+}
+
+// Actualizar estado de sincronización
+function updateSyncStatus(isConnected) {
+    const syncStatus = document.getElementById('syncStatus');
+    if (!syncStatus) return;
+    
+    if (isConnected) {
+        syncStatus.innerHTML = '<i class="fas fa-circle sync-connected"></i> <span>Sincronizado</span>';
+        syncStatus.querySelector('i').className = 'fas fa-circle sync-connected';
+    } else {
+        syncStatus.innerHTML = '<i class="fas fa-circle sync-disconnected"></i> <span>Sin conexión</span>';
+        syncStatus.querySelector('i').className = 'fas fa-circle sync-disconnected';
+    }
+}
+
+// Guardar mensajes en localStorage
+function saveMessagesToLocalStorage() {
+    try {
+        const messagesToSave = adminMessages.map(msg => ({
+            ...msg,
+            createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt,
+            updatedAt: msg.updatedAt instanceof Date ? msg.updatedAt.toISOString() : msg.updatedAt
+        }));
+        localStorage.setItem('adminMessages', JSON.stringify(messagesToSave));
+    } catch (error) {
+        console.error('❌ Error guardando mensajes en localStorage:', error);
+    }
+}
+
+// Cargar mensajes desde localStorage
+function loadMessagesFromLocalStorage() {
+    try {
+        const savedMessages = localStorage.getItem('adminMessages');
+        if (savedMessages) {
+            adminMessages = JSON.parse(savedMessages).map(msg => ({
+                ...msg,
+                createdAt: new Date(msg.createdAt),
+                updatedAt: msg.updatedAt ? new Date(msg.updatedAt) : null
+            }));
+            displayMessages();
+            updateMessageCount();
+            console.log(`📂 ${adminMessages.length} mensajes cargados desde localStorage`);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando mensajes desde localStorage:', error);
+        adminMessages = [];
+    }
+}
+
+// Publicar nuevo mensaje en Firestore
+async function publishMessageToFirestore(messageData) {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - agregar al array local
+        const newMessage = {
+            id: Date.now().toString(),
+            ...messageData,
+            createdAt: new Date(),
+            isLocal: true
+        };
+        adminMessages.unshift(newMessage);
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return newMessage.id;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
+        }
+        
+        // Crear documento con ID automático
+        const newMessageRef = firebase.modules.doc(messagesCollection);
+        
+        const messageWithMetadata = {
+            ...messageData,
+            createdAt: firebase.modules.serverTimestamp(),
+            updatedAt: firebase.modules.serverTimestamp()
+        };
+        
+        await firebase.modules.setDoc(newMessageRef, messageWithMetadata);
+        
+        console.log('✅ Mensaje publicado en Firestore:', newMessageRef.id);
+        return newMessageRef.id;
+        
+    } catch (error) {
+        console.error('❌ Error publicando mensaje en Firestore:', error);
+        throw error;
+    }
+}
+
+// Eliminar mensaje de Firestore
+async function deleteMessageFromFirestore(messageId) {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - eliminar del array local
+        adminMessages = adminMessages.filter(msg => msg.id !== messageId);
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return true;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
+        }
+        
+        const messageRef = firebase.modules.doc(messagesCollection, messageId);
+        await firebase.modules.deleteDoc(messageRef);
+        
+        console.log('✅ Mensaje eliminado de Firestore:', messageId);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error eliminando mensaje de Firestore:', error);
+        throw error;
+    }
+}
+
+// Eliminar todos los mensajes de Firestore
+async function deleteAllMessagesFromFirestore() {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - limpiar array local
+        adminMessages = [];
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return true;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
+        }
+        
+        // Obtener todos los mensajes
+        const snapshot = await firebase.modules.getDocs(messagesCollection);
+        
+        // Eliminar cada documento
+        const deletePromises = [];
+        snapshot.forEach((doc) => {
+            deletePromises.push(firebase.modules.deleteDoc(firebase.modules.doc(messagesCollection, doc.id)));
+        });
+        
+        await Promise.all(deletePromises);
+        
+        console.log(`✅ ${snapshot.size} mensajes eliminados de Firestore`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error eliminando todos los mensajes de Firestore:', error);
+        throw error;
+    }
+}
+
+// Función para formatear fecha relativa
+function formatRelativeTime(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 1) return 'Ahora mismo';
+    if (diffMins < 60) return `Hace ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`;
+    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+    if (diffDays < 7) return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+    
+    return date.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+// Obtener clase CSS para categoría
+function getCategoryClass(category) {
+    const categoryClasses = {
+        'general': 'category-general',
+        'tecnica': 'category-tecnica',
+        'consejo': 'category-consejo',
+        'anuncio': 'category-anuncio',
+        'mantenimiento': 'category-mantenimiento'
+    };
+    return categoryClasses[category] || 'category-general';
+}
+
+// Obtener ícono para categoría
+function getCategoryIcon(category) {
+    const categoryIcons = {
+        'general': 'fa-bullhorn',
+        'tecnica': 'fa-guitar',
+        'consejo': 'fa-lightbulb',
+        'anuncio': 'fa-exclamation-circle',
+        'mantenimiento': 'fa-tools'
+    };
+    return categoryIcons[category] || 'fa-bullhorn';
+}
+
+// Verificar si el usuario actual es admin
+function isCurrentUserAdmin() {
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    return userData && userData.role === 'admin';
+}
+
+// Mostrar los mensajes
+function displayMessages() {
+    if (!messagesList) return;
+    
+    messagesList.innerHTML = '';
+    
+    if (adminMessages.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    
+    if (emptyState) emptyState.style.display = 'none';
+    
+    adminMessages.forEach(message => {
+        const messageCard = document.createElement('div');
+        messageCard.className = 'question-card fade-in';
+        messageCard.dataset.id = message.id;
+        
+        // Formatear fecha
+        const date = message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt);
+        const formattedDate = date.toLocaleDateString('es-ES', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const relativeTime = formatRelativeTime(date);
+        const categoryClass = getCategoryClass(message.category || 'general');
+        const categoryIcon = getCategoryIcon(message.category || 'general');
+        
+        messageCard.innerHTML = `
+            <div class="question-header">
+                <h3 class="question-title">
+                    ${message.title}
+                    <span class="message-category-badge ${categoryClass}">
+                        <i class="fas ${categoryIcon}"></i> ${message.category || 'General'}
+                    </span>
+                </h3>
+                <div class="question-meta">
+                    <div class="question-author">
+                        <i class="fas fa-user-shield"></i> ${message.author}
+                        <span class="admin-badge">Admin</span>
+                    </div>
+                    <div class="question-date">
+                        <i class="far fa-calendar"></i> ${formattedDate}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="question-content">
+                ${message.content}
+            </div>
+            
+            <div class="message-timestamp">
+                <i class="far fa-clock"></i> ${relativeTime}
+                ${message.isLocal ? '<span style="color: var(--stage-3-color);"><i class="fas fa-exclamation-circle"></i> Pendiente de sincronizar</span>' : ''}
+            </div>
+            
+            <!-- BOTONES DE ACCIÓN (SOLO PARA ADMINS) -->
+            <div class="question-actions" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <button class="btn-outline delete-message-btn" data-id="${message.id}" style="padding: 5px 15px; font-size: 0.8rem;">
+                    <i class="fas fa-trash"></i> Eliminar Mensaje
+                </button>
+            </div>
+        `;
+        
+        messagesList.appendChild(messageCard);
+        
+        // Añadir evento para eliminar mensaje
+        const deleteBtn = messageCard.querySelector('.delete-message-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                deleteAdminMessage(message.id);
+            });
+        }
+    });
+    
+    // Actualizar visibilidad de botones de acción
+    updateMessageActionsVisibility();
+}
+
+// Actualizar contador de mensajes
+function updateMessageCount() {
+    const messageCount = document.getElementById('messageCount');
+    const liveMessageCount = document.getElementById('liveMessageCount');
+    
+    if (messageCount) {
+        messageCount.textContent = adminMessages.length;
+    }
+    if (liveMessageCount) {
+        liveMessageCount.textContent = adminMessages.length;
+    }
+}
+
+// Función para refrescar mensajes manualmente
+async function refreshMessages() {
+    const refreshBtn = document.querySelector('[onclick="refreshMessages()"]');
+    const originalContent = refreshBtn.innerHTML;
+    
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            // Forzar recarga desde Firestore
+            const messagesCollection = getMessagesCollection();
+            if (messagesCollection) {
+                const snapshot = await firebase.modules.getDocs(
+                    firebase.modules.query(messagesCollection, firebase.modules.orderBy('createdAt', 'desc'))
+                );
+                
+                adminMessages = [];
+                snapshot.forEach((doc) => {
+                    const messageData = doc.data();
+                    adminMessages.push({
+                        id: doc.id,
+                        ...messageData,
+                        createdAt: messageData.createdAt?.toDate?.() || new Date(messageData.createdAt),
+                    });
+                });
+                
+                displayMessages();
+                updateMessageCount();
+                saveMessagesToLocalStorage();
+                
+                showNotification(`✅ ${adminMessages.length} mensajes actualizados`, 'success');
+            }
+        } else {
+            showNotification('⚠️ Modo offline - usando mensajes locales', 'info');
+        }
+    } catch (error) {
+        console.error('❌ Error refrescando mensajes:', error);
+        showNotification('Error al actualizar mensajes', 'error');
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalContent;
+    }
+}
+
+// Función para eliminar un mensaje del admin
+async function deleteAdminMessage(messageId) {
+    // Verificar que el usuario sea admin
+    if (!isCurrentUserAdmin()) {
+        showNotification('Solo los administradores pueden eliminar mensajes', 'error');
+        return;
+    }
+    
+    if (!confirm('¿Estás seguro de que quieres eliminar este mensaje?\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        await deleteMessageFromFirestore(messageId);
+        showNotification('Mensaje eliminado correctamente', 'success');
+    } catch (error) {
+        console.error('❌ Error eliminando mensaje:', error);
+        showNotification('Error al eliminar el mensaje', 'error');
+    }
+}
+
+// Función para eliminar todos los mensajes
+window.deleteAllMessages = async function() {
+    if (!isCurrentUserAdmin()) {
+        showNotification('Solo los administradores pueden eliminar mensajes', 'error');
+        return;
+    }
+    
+    if (!confirm('¿Estás seguro de que quieres eliminar TODOS los mensajes?\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        await deleteAllMessagesFromFirestore();
+        showNotification('Todos los mensajes han sido eliminados', 'success');
+    } catch (error) {
+        console.error('❌ Error eliminando todos los mensajes:', error);
+        showNotification('Error al eliminar los mensajes', 'error');
+    }
+};
+
+// Formulario para nuevo mensaje
+if (askForm) {
+    askForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Verificar que el usuario sea admin
+        if (!isCurrentUserAdmin()) {
+            showNotification('Solo los administradores pueden publicar mensajes', 'error');
+            return;
+        }
+        
+        const messageTitle = document.getElementById('messageTitle').value.trim();
+        const messageContent = document.getElementById('messageContent').value.trim();
+        const messageCategory = document.getElementById('messageCategory').value;
+        const submitBtn = document.getElementById('submitMessageBtn');
+        
+        if (!messageTitle || !messageContent) {
+            showNotification('Por favor completa todos los campos', 'error');
+            return;
+        }
+        
+        // Obtener información del usuario actual
+        const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        
+        const originalContent = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+        
+        try {
+            const messageData = {
+                title: messageTitle,
+                content: messageContent,
+                category: messageCategory,
+                author: userData.name || 'Administrador',
+                authorEmail: userData.email,
+                authorId: userData.uid || 'local',
+                isAdmin: true
+            };
+            
+            await publishMessageToFirestore(messageData);
+            
+            // Limpiar formulario
+            askForm.reset();
+            
+            // Mostrar mensaje de éxito
+            showNotification('¡Mensaje publicado con éxito! Todos los usuarios lo verán.', 'success');
+            
+        } catch (error) {
+            console.error('❌ Error publicando mensaje:', error);
+            showNotification('Error al publicar el mensaje', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+        }
+    });
+}
+
+// Actualizar visibilidad del formulario según el rol
+function updateMessagesFormVisibility() {
+    const isAdmin = isCurrentUserAdmin();
+    const askSection = document.querySelector('.ask-section');
+    const studentMessage = document.querySelector('.student-only');
+    
+    if (askSection && studentMessage) {
+        if (isAdmin) {
+            askSection.style.display = 'block';
+            studentMessage.style.display = 'none';
+        } else {
+            askSection.style.display = 'none';
+            studentMessage.style.display = 'block';
+        }
+    }
+    
+    updateMessageActionsVisibility();
+}
+
+// Actualizar visibilidad de botones de acción
+function updateMessageActionsVisibility() {
+    const isAdmin = isCurrentUserAdmin();
+    const actionDivs = document.querySelectorAll('.question-actions');
+    
+    if (isAdmin) {
+        actionDivs.forEach(div => {
+            div.style.display = 'block';
+        });
+    } else {
+        actionDivs.forEach(div => {
+            div.style.display = 'none';
+        });
+    }
+}
+
+// Inicializar mensajes
+function initMessages() {
+    if (document.getElementById('foro')) {
+        console.log('💬 Inicializando sistema de mensajes...');
+        initMessagesSync();
+        updateMessagesFormVisibility();
+        isMessagesInitialized = true;
+    }
+}
+
+// ========== PANEL DE ADMINISTRACIÓN ==========
 let adminUsers = [];
 const userCache = {
     cache: new Map(),
-    timeout: 2 * 60 * 1000, // 2 minutos
+    timeout: 2 * 60 * 1000,
     
     get(key) {
         const item = this.cache.get(key);
@@ -1209,16 +2136,17 @@ function initAdminPanel() {
     console.log("👑 Inicializando panel de administración...");
     
     // Verificar que el usuario actual es admin
-    if (!currentUser || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) {
-        alert("⚠️ Acceso denegado. Solo administradores pueden acceder a esta página.");
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    if (!userData || userData.role !== 'admin') {
+        showNotification("⚠️ Acceso denegado. Solo administradores pueden acceder a esta página.", 'error');
         showPage('index');
         return;
     }
     
     // Actualizar información del admin
     const updates = [
-        { id: 'admin-username', value: currentUser.firstName || currentUser.name },
-        { id: 'admin-email', value: currentUser.email }
+        { id: 'admin-username', value: userData.firstName || userData.name },
+        { id: 'admin-email', value: userData.email }
     ];
     
     updates.forEach(update => {
@@ -1236,12 +2164,11 @@ function initAdminPanel() {
     }
 }
 
-// Cargar todos los usuarios optimizado
+// Cargar todos los usuarios
 async function loadAllUsers() {
     const usersList = document.getElementById('users-list');
     if (!usersList) return;
     
-    // Verificar caché primero
     const cachedUsers = userCache.get('allUsers');
     if (cachedUsers) {
         adminUsers = cachedUsers;
@@ -1257,7 +2184,6 @@ async function loadAllUsers() {
         const firebase = useFirebase();
         
         if (firebase.isAvailable) {
-            // Cargar desde Firestore
             const usersSnapshot = await firebase.modules.getDocs(
                 firebase.modules.collection(firebase.db, 'users')
             );
@@ -1276,7 +2202,6 @@ async function loadAllUsers() {
             console.log(`✅ ${adminUsers.length} usuarios cargados desde Firestore`);
             
         } else {
-            // Usar datos demo
             adminUsers = [
                 {
                     id: '1',
@@ -1320,9 +2245,7 @@ async function loadAllUsers() {
             console.log(`📋 ${adminUsers.length} usuarios demo cargados`);
         }
         
-        // Guardar en caché
         userCache.set('allUsers', adminUsers);
-        
         updateUsersTable();
         updateAdminStats();
         
@@ -1332,7 +2255,7 @@ async function loadAllUsers() {
     }
 }
 
-// Actualizar tabla de usuarios optimizada
+// Actualizar tabla de usuarios
 function updateUsersTable() {
     const usersList = document.getElementById('users-list');
     if (!usersList || !adminUsers.length) {
@@ -1340,19 +2263,17 @@ function updateUsersTable() {
         return;
     }
     
-    // Usar DocumentFragment para mejor rendimiento
     const fragment = document.createDocumentFragment();
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
     
     adminUsers.forEach(user => {
         const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
-        const isCurrentUser = user.email === currentUser?.email;
+        const isCurrentUser = user.email === userData?.email;
         const isAdmin = user.role === 'admin';
         
-        // Obtener iniciales para avatar
         const displayName = user.displayName || user.email.split('@')[0];
         const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         
-        // Formatear fechas
         const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
         const lastAccess = user.lastLogin ? 
             user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
@@ -1406,7 +2327,7 @@ function updateUsersTable() {
     usersList.appendChild(fragment);
 }
 
-// Actualizar estadísticas del admin optimizado
+// Actualizar estadísticas del admin
 function updateAdminStats() {
     const totalUsers = adminUsers.length;
     const activeUsers = adminUsers.filter(user => 
@@ -1436,7 +2357,7 @@ function updateAdminStats() {
     });
 }
 
-// Filtrar usuarios por búsqueda optimizado
+// Filtrar usuarios por búsqueda
 function filterUsers() {
     const searchTerm = document.getElementById('user-search').value.toLowerCase().trim();
     const usersList = document.getElementById('users-list');
@@ -1459,19 +2380,17 @@ function filterUsers() {
         return;
     }
     
-    // Actualizar solo con usuarios filtrados
     const fragment = document.createDocumentFragment();
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
     
     filteredUsers.forEach(user => {
         const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
-        const isCurrentUser = user.email === currentUser?.email;
+        const isCurrentUser = user.email === userData?.email;
         const isAdmin = user.role === 'admin';
         
-        // Obtener iniciales para avatar
         const displayName = user.displayName || user.email.split('@')[0];
         const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         
-        // Formatear fechas
         const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
         const lastAccess = user.lastLogin ? 
             user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
@@ -1525,20 +2444,7 @@ function filterUsers() {
     usersList.appendChild(fragment);
 }
 
-// Funciones del panel de administración
-window.manageUsers = function() {
-    showPage('admin-panel-page');
-};
-
-window.manageContent = function() {
-    alert('📚 Redirigiendo a gestión de contenido...');
-};
-
-window.viewStatistics = function() {
-    alert('📊 Redirigiendo a estadísticas...');
-};
-
-// Toggle rol de usuario optimizado
+// Toggle rol de usuario
 async function toggleUserRole(userId, userEmail) {
     if (!confirm(`¿Estás seguro de cambiar el rol de ${userEmail}?`)) {
         return;
@@ -1566,20 +2472,17 @@ async function toggleUserRole(userId, userEmail) {
             );
         }
         
-        // Actualizar en la lista local
         user.role = newRole;
-        
-        // Actualizar cache
         userCache.set('allUsers', adminUsers);
         
         updateUsersTable();
         updateAdminStats();
         
-        alert(`✅ Rol actualizado: ${userEmail} ahora es ${newRole === 'admin' ? 'administrador' : 'estudiante'}`);
+        showNotification(`✅ Rol actualizado: ${userEmail} ahora es ${newRole === 'admin' ? 'administrador' : 'estudiante'}`, 'success');
         
     } catch (error) {
         console.error('❌ Error cambiando rol:', error);
-        alert('Error al cambiar el rol del usuario');
+        showNotification('Error al cambiar el rol del usuario', 'error');
     }
 }
 
@@ -1593,16 +2496,13 @@ function editUser(userId) {
     
     if (newName.trim()) {
         user.displayName = newName.trim();
-        
-        // Actualizar cache
         userCache.set('allUsers', adminUsers);
-        
         updateUsersTable();
-        alert('✅ Nombre actualizado correctamente');
+        showNotification('✅ Nombre actualizado correctamente', 'success');
     }
 }
 
-// Eliminar usuario optimizado
+// Eliminar usuario
 async function deleteUser(userId, userEmail) {
     if (!confirm(`¿Estás seguro de eliminar al usuario ${userEmail}?\nEsta acción no se puede deshacer.`)) {
         return;
@@ -1624,20 +2524,17 @@ async function deleteUser(userId, userEmail) {
             );
         }
         
-        // Eliminar de la lista local
         adminUsers = adminUsers.filter(u => u.id !== userId);
-        
-        // Actualizar cache
         userCache.set('allUsers', adminUsers);
         
         updateUsersTable();
         updateAdminStats();
         
-        alert('✅ Usuario eliminado correctamente');
+        showNotification('✅ Usuario eliminado correctamente', 'success');
         
     } catch (error) {
         console.error('❌ Error eliminando usuario:', error);
-        alert('Error al eliminar el usuario');
+        showNotification('Error al eliminar el usuario', 'error');
     }
 }
 
@@ -1645,7 +2542,7 @@ async function deleteUser(userId, userEmail) {
 function sendAnnouncement() {
     const message = prompt('Escribe el anuncio que quieres enviar a todos los usuarios:');
     if (message && message.trim()) {
-        alert(`📢 Anuncio enviado a ${adminUsers.length} usuarios:\n\n"${message}"`);
+        showNotification(`📢 Anuncio enviado a ${adminUsers.length} usuarios`, 'success');
     }
 }
 
@@ -1673,7 +2570,7 @@ function exportUsers() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    alert(`✅ Datos exportados: ${adminUsers.length} usuarios`);
+    showNotification(`✅ Datos exportados: ${adminUsers.length} usuarios`, 'success');
 }
 
 // Generar reporte mensual
@@ -1684,7 +2581,7 @@ function generateReport() {
     const newThisMonth = adminUsers.filter(user => user.createdAt >= monthAgo).length;
     const activeThisMonth = adminUsers.filter(user => user.lastLogin && user.lastLogin >= monthAgo).length;
     
-    alert(`📊 Reporte Mensual:\n\n• Nuevos usuarios este mes: ${newThisMonth}\n• Usuarios activos este mes: ${activeThisMonth}\n• Total usuarios: ${adminUsers.length}\n• Administradores: ${adminUsers.filter(u => u.role === 'admin').length}\n• Estudiantes: ${adminUsers.filter(u => u.role === 'student').length}`);
+    showNotification(`📊 Reporte Mensual:\n\n• Nuevos usuarios este mes: ${newThisMonth}\n• Usuarios activos este mes: ${activeThisMonth}\n• Total usuarios: ${adminUsers.length}\n• Administradores: ${adminUsers.filter(u => u.role === 'admin').length}\n• Estudiantes: ${adminUsers.filter(u => u.role === 'student').length}`, 'info');
 }
 
 // Respaldar base de datos
@@ -1705,10 +2602,11 @@ function backupDatabase() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    alert('✅ Respaldo de base de datos generado y descargado');
+    showNotification('✅ Respaldo de base de datos generado y descargado', 'success');
 }
 
-// ========== AFINADOR MEJORADO CON DETECCIÓN REAL ==========
+// ========== AFINADOR MEJORADO ==========
+
 // Configuración de cuerdas
 const STRINGS = {
     'mi-high': {
@@ -1845,7 +2743,7 @@ async function toggleMicrophoneAfinador() {
             await startListeningAfinador();
         } catch (error) {
             console.error('Error al acceder al micrófono:', error);
-            alert('No se pudo acceder al micrófono. Asegúrate de permitir el acceso.');
+            showNotification('No se pudo acceder al micrófono. Asegúrate de permitir el acceso.', 'error');
         }
     } else {
         stopListeningAfinador();
@@ -1889,7 +2787,7 @@ async function startListeningAfinador() {
         
     } catch (error) {
         console.error('Error en configuración de audio:', error);
-        alert('Error al acceder al micrófono. Asegúrate de que tu micrófono esté conectado y tengas permisos para usarlo.');
+        showNotification('Error al acceder al micrófono. Asegúrate de que tu micrófono esté conectado y tengas permisos para usarlo.', 'error');
         throw error;
     }
 }
@@ -2172,6 +3070,7 @@ function updateDeviationDisplayAfinador(cents, string) {
 }
 
 // ========== METRÓNOMO MEJORADO ==========
+
 // Variables del metrónomo
 let metronomo = {
     isPlaying: false,
@@ -2206,7 +3105,7 @@ function initMetronomo() {
         metronomo.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     } catch (error) {
         console.error('Error creando AudioContext:', error);
-        alert('Tu navegador no soporta la API de Audio necesaria para el metrónomo.');
+        showNotification('Tu navegador no soporta la API de Audio necesaria para el metrónomo.', 'error');
         return;
     }
     
@@ -2473,8 +3372,6 @@ function tapTempoMetronomo() {
             metronomoElements.tapTempoBtn.style.transform = 'scale(1)';
         }, 100);
     }
-    
-    console.log('👆 Tap Tempo registrado');
 }
 
 // Manejar teclado shortcuts del metrónomo
@@ -2509,12 +3406,44 @@ function handleMetronomoKeyboardShortcuts(e) {
     }
 }
 
+// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN ==========
+window.manageUsers = function() {
+    showPage('admin-panel-page');
+};
+
+window.manageContent = function() {
+    showNotification('📚 Redirigiendo a gestión de contenido...', 'info');
+};
+
+window.viewStatistics = function() {
+    showNotification('📊 Redirigiendo a estadísticas...', 'info');
+};
+
+window.loadAllUsers = loadAllUsers;
+window.sendAnnouncement = sendAnnouncement;
+window.exportUsers = exportUsers;
+window.generateReport = generateReport;
+window.backupDatabase = backupDatabase;
+window.refreshMessages = refreshMessages;
+
 // ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM cargado, inicializando aplicación optimizada...');
+    console.log('🚀 DOM cargado, inicializando aplicación...');
     
-    // Inicializar Firebase optimizado
+    // Inicializar Firebase
     initializeFirebase();
+    
+    // Monitorear cambios en el estado del usuario para mensajes
+    let lastUserState = null;
+    setInterval(() => {
+        const currentUser = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        if (JSON.stringify(currentUser) !== JSON.stringify(lastUserState)) {
+            lastUserState = currentUser;
+            if (document.getElementById('foro')?.classList.contains('active')) {
+                updateMessagesFormVisibility();
+            }
+        }
+    }, 1000);
     
     // Efecto de escritura en el hero
     const heroText = document.querySelector('.hero h1');

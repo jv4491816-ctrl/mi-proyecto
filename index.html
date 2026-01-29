@@ -25,6 +25,7 @@
                 <li><a href="#" class="nav-link active" data-page="index">Inicio</a></li>
                 <li><a href="#" class="nav-link" data-page="afinacion-tips">Afinación y Tips</a></li>
                 <li><a href="#" class="nav-link" data-page="metronomo">Metrónomo</a></li>
+                <li><a href="#" class="nav-link" data-page="foro">Mensajes del Admin</a></li>
                 <li><a href="#" class="nav-link" data-page="partituras">Partituras</a></li>
                 <li><a href="#" class="nav-link" data-page="aprendizaje">Aprendizaje</a></li>
                 <li><a href="#" class="nav-link" data-page="guitarra">Guitarra</a></li>
@@ -59,7 +60,7 @@
         </nav>
     </header>
 
-    <!-- Modal de Login/Registro Mejorado -->
+    <!-- Modal de Login/Registro -->
     <div id="loginModal" class="modal">
         <div class="modal-container">
             <div class="modal-welcome-section">
@@ -124,9 +125,9 @@
                 </div>
                 <p>Bienvenido, <span id="admin-welcome-name" style="font-weight: 600; color: var(--primary-blue);"></span></p>
                 <div class="admin-actions">
-                    <button class="btn" onclick="manageUsers()">Gestionar Usuarios</button>
-                    <button class="btn" onclick="manageContent()">Gestionar Contenido</button>
-                    <button class="btn" onclick="viewStatistics()">Ver Estadísticas</button>
+                    <button class="btn" onclick="window.manageUsers()">Gestionar Usuarios</button>
+                    <button class="btn" onclick="window.manageContent()">Gestionar Contenido</button>
+                    <button class="btn" onclick="window.viewStatistics()">Ver Estadísticas</button>
                 </div>
             </div>
 
@@ -153,12 +154,12 @@
                     <p>Afinación precisa y consejos expertos para mejorar tu técnica</p>
                 </div>
                 
-                <div class="feature-card" data-page="partituras">
+                <div class="feature-card" data-page="foro">
                     <div class="feature-icon">
-                        <i class="fas fa-file-alt"></i>
+                        <i class="fas fa-bullhorn"></i>
                     </div>
-                    <h3>Biblioteca de Partituras</h3>
-                    <p>Canciones para todos los niveles, desde principiantes hasta avanzados</p>
+                    <h3>Mensajes del Admin</h3>
+                    <p>Tips y anuncios importantes de los administradores para tu aprendizaje</p>
                 </div>
                 
                 <div class="feature-card" data-page="aprendizaje">
@@ -212,16 +213,16 @@
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <i class="fas fa-book"></i>
+                            <i class="fas fa-bullhorn"></i>
                         </div>
-                        <h3>Gestión de Contenido</h3>
-                        <p>Crea y actualiza lecciones, ejercicios y materiales educativos</p>
+                        <h3>Publicar Mensajes</h3>
+                        <p>Envía tips y anuncios importantes a todos los usuarios</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Página de Afinación y Tips con el Afinador Mejorado -->
+        <!-- Página de Afinación y Tips -->
         <div id="afinacion-tips" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -323,7 +324,7 @@
             </div>
         </div>
 
-        <!-- Página del Metrónomo Mejorado -->
+        <!-- Página del Metrónomo -->
         <div id="metronomo" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -395,7 +396,101 @@
             </div>
         </div>
 
-        <!-- Otras páginas -->
+        <!-- Página de Mensajes del Admin -->
+        <div id="foro" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            
+            <!-- HEADER DE MENSAJES -->
+            <header class="header fade-in">
+                <div class="logo">
+                    <i class="fas fa-bullhorn"></i>
+                    <h1>Mensajes del <span>Admin</span></h1>
+                </div>
+                <p class="subtitle">Tips, anuncios y consejos importantes de los administradores para tu aprendizaje musical.</p>
+            </header>
+
+            <!-- FORMULARIO PARA PUBLICAR MENSAJES (SOLO PARA ADMINS) -->
+            <section class="ask-section fade-in admin-only" style="display: none;">
+                <h2><i class="fas fa-edit"></i> Publicar Nuevo Mensaje</h2>
+                <form id="askForm" class="ask-form">
+                    <div class="form-group">
+                        <label for="messageTitle">Título del Mensaje</label>
+                        <input type="text" id="messageTitle" placeholder="Ej: Tip para cambiar acordes rápidamente" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="messageContent">Contenido del Mensaje</label>
+                        <textarea id="messageContent" rows="4" placeholder="Escribe tu mensaje o tip aquí..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="messageCategory">Categoría</label>
+                        <select id="messageCategory" class="time-input" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.1); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 10px;">
+                            <option value="general">General</option>
+                            <option value="tecnica">Técnica</option>
+                            <option value="consejo">Consejo</option>
+                            <option value="anuncio">Anuncio Importante</option>
+                            <option value="mantenimiento">Mantenimiento</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn" id="submitMessageBtn">
+                        <i class="fas fa-paper-plane"></i> Publicar Mensaje
+                    </button>
+                    <!-- Botón para eliminar todos los mensajes (solo admin) -->
+                    <button type="button" class="btn" onclick="deleteAllMessages()" style="background: var(--accent-red); margin-top: 10px;">
+                        <i class="fas fa-trash"></i> Eliminar Todos los Mensajes
+                    </button>
+                </form>
+            </section>
+
+            <!-- MENSAJE PARA NO ADMINS -->
+            <div class="student-only" style="display: none; margin-bottom: 2rem; padding: 1.5rem; background: rgba(251, 188, 4, 0.1); border-radius: 15px; border: 1px solid rgba(251, 188, 4, 0.2);">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <i class="fas fa-info-circle" style="color: var(--stage-3-color); font-size: 1.2rem;"></i>
+                    <h3 style="color: var(--text-white); margin: 0;">Información de Mensajes</h3>
+                </div>
+                <p style="color: rgba(255, 255, 255, 0.9); margin-bottom: 0;">
+                    👁️ <strong>Todos pueden leer</strong> los mensajes del administrador.<br>
+                    ✏️ Solo los <strong>administradores</strong> pueden publicar nuevos mensajes.
+                </p>
+            </div>
+
+            <!-- CONTADOR DE MENSAJES Y ESTADO -->
+            <div class="stats-container" style="margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="color: var(--text-white); margin-bottom: 5px;">Mensajes Activos</h4>
+                        <div id="messageCount" style="font-size: 2rem; font-weight: bold; color: var(--primary-blue);">0</div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-outline btn-sm" onclick="refreshMessages()">
+                            <i class="fas fa-sync-alt"></i> Actualizar
+                        </button>
+                        <div id="syncStatus" style="display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.7);">
+                            <i class="fas fa-circle" style="font-size: 0.6rem;"></i>
+                            <span>Conectando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LISTA DE MENSAJES -->
+            <section class="questions-section">
+                <h2 class="section-title">
+                    <i class="fas fa-list"></i> Mensajes Publicados
+                    <span class="count-badge" id="liveMessageCount">0</span>
+                </h2>
+                
+                <div id="messagesList" class="questions-list">
+                    <!-- Los mensajes se cargarán aquí con JavaScript -->
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-bullhorn"></i>
+                        <h3>No hay mensajes aún</h3>
+                        <p>El administrador publicará tips y anuncios importantes aquí</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Página de Bibliotecas de Partituras -->
         <div id="partituras" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -413,6 +508,7 @@
             </div>
         </div>
 
+        <!-- Página de Aprendizaje -->
         <div id="aprendizaje" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -430,6 +526,7 @@
             </div>
         </div>
 
+        <!-- Página de Guitarra -->
         <div id="guitarra" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -447,7 +544,7 @@
             </div>
         </div>
 
-        <!-- Página de Panel de Administración (ID CORREGIDO) -->
+        <!-- Página de Panel de Administración -->
         <div id="admin-panel-page" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
             <div class="section-title">
@@ -491,7 +588,7 @@
                 <div class="admin-section">
                     <h3><i class="fas fa-user-cog"></i> Gestión de Usuarios</h3>
                     <div class="admin-controls">
-                        <button class="admin-btn" onclick="loadAllUsers()">
+                        <button class="admin-btn" onclick="window.loadAllUsers()">
                             <i class="fas fa-sync-alt"></i> Actualizar Lista
                         </button>
                         <div class="search-box">
@@ -529,19 +626,19 @@
                 <div class="admin-section">
                     <h3><i class="fas fa-tools"></i> Herramientas Rápidas</h3>
                     <div class="tools-grid">
-                        <button class="tool-btn" onclick="sendAnnouncement()">
+                        <button class="tool-btn" onclick="window.sendAnnouncement()">
                             <i class="fas fa-bullhorn"></i>
                             <span>Enviar Anuncio</span>
                         </button>
-                        <button class="tool-btn" onclick="exportUsers()">
+                        <button class="tool-btn" onclick="window.exportUsers()">
                             <i class="fas fa-file-export"></i>
                             <span>Exportar Datos</span>
                         </button>
-                        <button class="tool-btn" onclick="generateReport()">
+                        <button class="tool-btn" onclick="window.generateReport()">
                             <i class="fas fa-chart-pie"></i>
                             <span>Reporte Mensual</span>
                         </button>
-                        <button class="tool-btn" onclick="backupDatabase()">
+                        <button class="tool-btn" onclick="window.backupDatabase()">
                             <i class="fas fa-database"></i>
                             <span>Respaldar BD</span>
                         </button>
@@ -632,7 +729,10 @@
             collection,
             getDocs,
             query,
-            where
+            where,
+            orderBy,
+            onSnapshot,
+            deleteDoc
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         console.log("🚀 Firebase Modular v10 cargando...");
@@ -681,7 +781,10 @@
                 collection,
                 getDocs,
                 query,
-                where
+                where,
+                orderBy,
+                onSnapshot,
+                deleteDoc
             };
             
             window.firebaseReady = true;
