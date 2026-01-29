@@ -21,6 +21,18 @@
     --strong-beat-color: #ea4335;      /* Rojo para tiempo fuerte */
     --weak-beat-color: #fbbc04;        /* Naranja para tiempo débil */
     --inactive-beat-color: #9aa0a6;    /* Gris para inactivo */
+    
+    /* Colores específicos para categorías del foro */
+    --category-tecnica: #4285f4;       /* Azul para técnica */
+    --category-equipos: #34a853;       /* Verde para equipos */
+    --category-aprendizaje: #fbbc04;   /* Naranja para aprendizaje */
+    --category-teoria: #9b59b6;        /* Púrpura para teoría */
+    --category-conciertos: #ea4335;    /* Rojo para conciertos */
+    
+    /* Estados de temas */
+    --status-new: #34a853;             /* Verde para temas nuevos */
+    --status-hot: #ea4335;             /* Rojo para temas populares */
+    --status-normal: #4285f4;          /* Azul para temas normales */
 }
 
 /* ========== ESTILOS GENERALES ========== */
@@ -128,6 +140,11 @@ nav {
     border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
+}
+
+.role-badge.role-admin {
+    background: var(--stage-3-color);
+    color: var(--background-dark);
 }
 
 .btn-outline {
@@ -1036,6 +1053,390 @@ nav {
     margin-right: 8px;
 }
 
+/* ========== CORRECCIÓN TABLA USUARIOS - PANEL ADMIN ========== */
+.user-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    overflow: hidden;
+}
+
+.user-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.user-name {
+    font-weight: 600;
+    color: var(--text-white);
+    font-size: 0.95rem;
+}
+
+.user-you-badge {
+    color: var(--stage-3-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+/* ========== PANEL DE ADMINISTRACIÓN COMPLETO ========== */
+.admin-panel-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-welcome h3 {
+    color: var(--text-white);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-welcome p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.admin-stats {
+    display: flex;
+    gap: 1rem;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--primary-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-white);
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.admin-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-section h3 {
+    color: var(--text-white);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    gap: 1rem;
+}
+
+.admin-btn {
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-btn:hover {
+    background: #1565c0;
+    transform: translateY(-2px);
+}
+
+.search-box {
+    position: relative;
+    flex-grow: 1;
+    max-width: 300px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 15px 10px 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: var(--text-white);
+    font-size: 0.9rem;
+}
+
+.search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.users-table-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(0, 0, 0, 0.2);
+    min-width: 1000px;
+}
+
+.users-table th {
+    background: rgba(26, 115, 232, 0.2);
+    color: var(--text-white);
+    padding: 15px 20px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.users-table td {
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.9);
+    vertical-align: middle;
+}
+
+/* Ajuste para columnas de fecha */
+.users-table td:nth-child(3),
+.users-table td:nth-child(4) {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.users-table tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.role-badge-cell {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.role-badge-cell.admin {
+    background: rgba(251, 188, 4, 0.2);
+    color: var(--stage-3-color);
+}
+
+.role-badge-cell.student {
+    background: rgba(26, 115, 232, 0.2);
+    color: var(--primary-blue);
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-badge.active {
+    background: rgba(52, 168, 83, 0.2);
+    color: var(--stage-2-color);
+}
+
+.status-badge.inactive {
+    background: rgba(234, 67, 53, 0.2);
+    color: var(--accent-red);
+}
+
+.user-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.action-icon-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-white);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-icon-btn:hover {
+    background: var(--primary-blue);
+    transform: translateY(-2px);
+}
+
+.action-icon-btn.delete:hover {
+    background: var(--accent-red);
+}
+
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.tool-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    color: var(--text-white);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+}
+
+.tool-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--primary-blue);
+    transform: translateY(-3px);
+}
+
+.tool-btn i {
+    font-size: 2rem;
+    color: var(--primary-blue);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.stat-box {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.stat-box h4 {
+    color: var(--text-white);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.activity-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    height: 150px;
+    padding: 1rem 0;
+}
+
+.chart-bar {
+    flex: 1;
+    background: linear-gradient(to top, var(--primary-blue), #5e97f6);
+    border-radius: 4px 4px 0 0;
+    min-height: 20px;
+    transition: height 0.3s;
+}
+
+.role-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.role-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--primary-blue);
+}
+
 /* ========== FOOTER MODERNO ========== */
 footer {
     background: var(--background-dark);
@@ -1474,6 +1875,404 @@ footer {
     100% { opacity: 1; }
 }
 
+/* ========== ESTILOS PARA BADGE DE CATEGORÍA EN MENSAJES ========== */
+.message-category-badge {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.category-general {
+    background: rgba(66, 133, 244, 0.2);
+    color: var(--category-tecnica);
+}
+
+.category-tecnica {
+    background: rgba(66, 133, 244, 0.2);
+    color: var(--category-tecnica);
+}
+
+.category-consejo {
+    background: rgba(52, 168, 83, 0.2);
+    color: var(--category-equipos);
+}
+
+.category-anuncio {
+    background: rgba(251, 188, 4, 0.2);
+    color: var(--category-aprendizaje);
+}
+
+.category-mantenimiento {
+    background: rgba(155, 89, 182, 0.2);
+    color: var(--category-teoria);
+}
+
+/* ========== ESTADO DE SINCRONIZACIÓN ========== */
+.sync-connected {
+    color: var(--stage-2-color) !important;
+}
+
+.sync-disconnected {
+    color: var(--accent-red) !important;
+}
+
+.sync-connecting {
+    color: var(--stage-3-color) !important;
+}
+
+/* ========== INDICADOR DE NUEVO MENSAJE ========== */
+.new-message-indicator {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    animation: pulse 1.5s infinite;
+}
+
+/* ========== TIMESTAMP DE MENSAJE ========== */
+.message-timestamp {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ========== ESTILOS PARA MENSAJES DEL ADMIN ========== */
+
+/* Header de mensajes */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.header .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.header .logo i {
+    font-size: 2.5rem;
+    color: var(--primary-blue);
+    animation: float 3s ease-in-out infinite;
+}
+
+.header .logo h1 {
+    font-size: 2.5rem;
+    color: var(--text-white);
+}
+
+.header .logo span {
+    color: var(--primary-blue);
+}
+
+.header .subtitle {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Formulario de mensajes */
+.ask-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.ask-section h2 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: var(--text-white);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ask-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-white);
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Lista de mensajes */
+.questions-section {
+    margin-bottom: 40px;
+}
+
+.questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.question-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s;
+    position: relative;
+}
+
+.question-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-blue);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    gap: 15px;
+}
+
+.question-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-white);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.question-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.question-author {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.question-content {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+    margin-bottom: 15px;
+    font-size: 1.05rem;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Badge de admin */
+.admin-badge {
+    background: var(--primary-blue);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+/* Notificaciones */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+    background: var(--stage-2-color);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+    max-width: 400px;
+}
+
+.notification.success {
+    background: var(--stage-2-color);
+}
+
+.notification.error {
+    background: var(--accent-red);
+}
+
+.notification.info {
+    background: var(--primary-blue);
+}
+
+/* ========== BTN OUTLINE PEQUEÑO ========== */
+.btn-sm {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
+
+/* ========== CONTADORES ========== */
+.count-badge {
+    background: var(--primary-blue);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+/* ========== STATS CONTAINER ========== */
+.stats-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ========== ESTILOS PARA VALIDACIÓN DE CONTRASEÑA ========== */
+.password-strength {
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.strength-bar {
+    height: 5px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strength-weak { background: var(--accent-red); width: 20%; }
+.strength-medium { background: var(--stage-3-color); width: 50%; }
+.strength-good { background: #ffa726; width: 70%; }
+.strength-strong { background: var(--stage-2-color); width: 100%; }
+
+.password-rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+
+.password-rule {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.password-rule.valid {
+    color: var(--stage-2-color);
+}
+
+.password-rule.invalid {
+    color: var(--accent-red);
+}
+
+.password-match {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.password-match.valid {
+    color: var(--stage-2-color);
+}
+
+.password-match.invalid {
+    color: var(--accent-red);
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
     .nav-links {
@@ -1603,6 +2402,86 @@ footer {
         height: 40px;
         font-size: 1rem;
     }
+    
+    /* Panel admin responsive */
+    .admin-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .admin-stats {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .stat-card {
+        min-width: 100px;
+        padding: 0.8rem;
+    }
+    
+    .admin-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-box {
+        max-width: 100%;
+    }
+    
+    .users-table {
+        font-size: 0.8rem;
+        min-width: 600px;
+    }
+    
+    .user-actions {
+        flex-wrap: wrap;
+    }
+    
+    .tools-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .users-table td,
+    .users-table th {
+        padding: 12px 15px;
+    }
+    
+    /* Mensajes responsive */
+    .header .logo h1 {
+        font-size: 2rem;
+    }
+    
+    .header .subtitle {
+        font-size: 1rem;
+    }
+    
+    .ask-section,
+    .question-card {
+        padding: 20px 15px;
+    }
+    
+    .question-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .question-meta {
+        align-items: flex-start;
+    }
+    
+    .question-title {
+        font-size: 1.2rem;
+    }
+    
+    .message-category-badge {
+        margin-left: 0;
+        margin-top: 5px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1644,6 +2523,23 @@ footer {
     
     .bpm-value {
         font-size: 3rem;
+    }
+    
+    .stat-card {
+        min-width: 80px;
+        padding: 0.6rem;
+    }
+    
+    .stat-number {
+        font-size: 1.2rem;
+    }
+    
+    .users-table {
+        min-width: 500px;
+    }
+    
+    .question-title {
+        font-size: 1.1rem;
     }
 }
 

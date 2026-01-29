@@ -3,6 +3,7 @@ const navLinks = document.querySelectorAll('.nav-link, .back-btn, .feature-card'
 const pages = document.querySelectorAll('.page');
 const menuToggle = document.getElementById('menuToggle');
 const navLinksContainer = document.getElementById('navLinks');
+const adminNavItem = document.getElementById('admin-nav-item');
 
 // Función para cambiar de página
 function showPage(pageId) {
@@ -30,6 +31,14 @@ function showPage(pageId) {
         initAfinador();
     } else if (pageId === 'metronomo') {
         initMetronomo();
+    } else if (pageId === 'admin-panel-page') {
+        initAdminPanel();
+    } else if (pageId === 'foro') {
+        // Inicializar mensajes si no están inicializados
+        if (!isMessagesInitialized) {
+            initMessages();
+            isMessagesInitialized = true;
+        }
     }
 }
 
@@ -51,147 +60,417 @@ menuToggle.addEventListener('click', function() {
 const initialPage = window.location.hash.substring(1) || 'index';
 showPage(initialPage);
 
-// ========== SISTEMA DE AUTENTICACIÓN FIREBASE v10 MODULAR ==========
+// ========== SISTEMA DE NOTIFICACIONES ==========
+function showNotification(message, type = 'info') {
+    // Remover notificación anterior si existe
+    const oldNotification = document.querySelector('.notification');
+    if (oldNotification) {
+        oldNotification.remove();
+    }
+    
+    // Crear notificación
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-eliminar después de 3 segundos
+    setTimeout(() => {
+        notification.style.animation = 'fadeIn 0.3s ease reverse';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// ========== FUNCIONES DE VALIDACIÓN DE CONTRASEÑA ==========
+
+// Función para validar la fortaleza de la contraseña
+function validatePasswordStrength() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const strengthBar = document.getElementById('strengthBar');
+    const passwordRules = {
+        length: document.getElementById('ruleLength'),
+        upper: document.getElementById('ruleUpper'),
+        lower: document.getElementById('ruleLower'),
+        number: document.getElementById('ruleNumber'),
+        symbol: document.getElementById('ruleSymbol')
+    };
+    
+    if (!password) {
+        // Resetear todo si no hay contraseña
+        Object.values(passwordRules).forEach(rule => {
+            if (rule) rule.style.color = 'var(--accent-red)';
+        });
+        if (strengthBar) strengthBar.style.width = '0%';
+        return false;
+    }
+    
+    // Validaciones individuales
+    const rules = {
+        length: password.length >= 8,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+    
+    // Actualizar colores de las reglas
+    Object.keys(rules).forEach(key => {
+        const ruleElement = passwordRules[key];
+        if (ruleElement) {
+            ruleElement.style.color = rules[key] ? 'var(--stage-2-color)' : 'var(--accent-red)';
+        }
+    });
+    
+    // Calcular fortaleza (0-100%)
+    const validRules = Object.values(rules).filter(Boolean).length;
+    const strength = (validRules / 5) * 100;
+    
+    // Actualizar barra de fortaleza
+    if (strengthBar) {
+        strengthBar.style.width = `${strength}%`;
+        if (strength < 40) {
+            strengthBar.style.backgroundColor = 'var(--accent-red)';
+        } else if (strength < 80) {
+            strengthBar.style.backgroundColor = 'var(--stage-3-color)';
+        } else {
+            strengthBar.style.backgroundColor = 'var(--stage-2-color)';
+        }
+    }
+    
+    return validRules === 5; // Todas las reglas cumplidas
+}
+
+// Función para validar que las contraseñas coincidan
+function validatePasswordMatch() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value || '';
+    const matchStatus = document.getElementById('matchStatus');
+    const confirmError = document.getElementById('modalSignupConfirmPasswordError');
+    
+    if (!matchStatus) return false;
+    
+    if (!confirmPassword) {
+        matchStatus.textContent = '✓ Las contraseñas coinciden';
+        matchStatus.style.color = 'var(--accent-red)';
+        if (confirmError) confirmError.textContent = '';
+        return false;
+    }
+    
+    const passwordsMatch = password === confirmPassword;
+    
+    if (passwordsMatch) {
+        matchStatus.textContent = '✓ Las contraseñas coinciden';
+        matchStatus.style.color = 'var(--stage-2-color)';
+        if (confirmError) confirmError.textContent = '';
+    } else {
+        matchStatus.textContent = '✗ Las contraseñas no coinciden';
+        matchStatus.style.color = 'var(--accent-red)';
+        if (confirmError) confirmError.textContent = 'Las contraseñas no coinciden';
+    }
+    
+    return passwordsMatch;
+}
+
+// Función para validar toda la contraseña (fortaleza + coincidencia)
+function validateCompletePassword() {
+    const password = document.getElementById('modalSignupPassword')?.value || '';
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value || '';
+    const passwordError = document.getElementById('modalSignupPasswordError');
+    const confirmError = document.getElementById('modalSignupConfirmPasswordError');
+    
+    // Resetear errores
+    if (passwordError) passwordError.textContent = '';
+    if (confirmError) confirmError.textContent = '';
+    
+    // Validar longitud mínima
+    if (password.length < 8) {
+        if (passwordError) passwordError.textContent = 'La contraseña debe tener al menos 8 caracteres';
+        return false;
+    }
+    
+    // Validar reglas de complejidad
+    const rules = {
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+    
+    const missingRules = [];
+    if (!rules.upper) missingRules.push('mayúscula');
+    if (!rules.lower) missingRules.push('minúscula');
+    if (!rules.number) missingRules.push('número');
+    if (!rules.symbol) missingRules.push('símbolo');
+    
+    if (missingRules.length > 0) {
+        if (passwordError) {
+            passwordError.textContent = `Falta: ${missingRules.join(', ')}`;
+        }
+        return false;
+    }
+    
+    // Validar coincidencia
+    if (password !== confirmPassword) {
+        if (confirmError) confirmError.textContent = 'Las contraseñas no coinciden';
+        return false;
+    }
+    
+    return true;
+}
+
+// ========== SISTEMA DE AUTENTICACIÓN FIREBASE MODULAR ==========
 const loginModal = document.getElementById('loginModal');
 const modalFormSection = document.getElementById('modalFormSection');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalSignupBtn = document.getElementById('modalSignupBtn');
 const modalLoginBtn = document.getElementById('modalLoginBtn');
-const studentLoginBtn = document.getElementById('student-login-btn');
-const adminLoginBtn = document.getElementById('admin-login-btn');
+const loginBtn = document.getElementById('login-btn');
+const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const authButtons = document.getElementById('auth-buttons');
 const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
-const userRole = document.getElementById('user-role');
+const userAvatar = document.getElementById('user-avatar');
+const userAvatarContainer = document.getElementById('user-avatar-container');
+const userProfile = document.getElementById('user-profile');
 
 let currentFormType = 'login';
 let currentUser = null;
-let firebaseAvailable = false;
-let auth = null;
-let db = null;
-let firebaseModules = null;
 
-// Verificar si Firebase Modular está disponible
-function checkFirebaseAvailability() {
-    console.log("🔍 Verificando Firebase Modular v10...");
+// Lista de emails admin específicos
+const ADMIN_EMAILS = [
+    'jv4491816@gmail.com',
+    'fraylingay@gmail.com',
+    'admin@demo.com'
+];
+
+// ========== SISTEMA DE ESTADO DE FIREBASE ==========
+const firebaseState = {
+    available: false,
+    auth: null,
+    db: null,
+    modules: null,
+    lastChecked: null,
+    retryAttempts: 0,
+    maxRetries: 2
+};
+
+// Función para actualizar estado de Firebase
+function updateFirebaseState() {
+    const previousState = firebaseState.available;
     
-    if (!window.firebaseReady) {
-        console.log("❌ Firebase NO está listo (window.firebaseReady = false)");
-        return false;
+    const isAvailable = Boolean(
+        window.firebaseReady && 
+        window.firebaseAuth && 
+        window.firebaseModules
+    );
+    
+    firebaseState.available = isAvailable;
+    
+    if (isAvailable) {
+        firebaseState.auth = window.firebaseAuth;
+        firebaseState.db = window.firebaseDb;
+        firebaseState.modules = window.firebaseModules;
+        firebaseState.retryAttempts = 0;
+        console.log("✅ Firebase Modular disponible");
+    } else {
+        firebaseState.auth = null;
+        firebaseState.db = null;
+        firebaseState.modules = null;
+        console.warn("⚠️ Firebase Modular NO disponible");
     }
     
-    if (!window.firebaseAuth) {
-        console.log("❌ Firebase Auth NO está disponible");
-        return false;
+    firebaseState.lastChecked = Date.now();
+    
+    if (previousState !== firebaseState.available) {
+        console.log(`Firebase: ${previousState ? 'ON' : 'OFF'} → ${firebaseState.available ? 'ON' : 'OFF'}`);
     }
     
-    if (!window.firebaseModules) {
-        console.log("❌ Firebase Modules NO están disponibles");
-        return false;
-    }
-    
-    console.log("✅ Firebase Modular v10 está completamente disponible");
-    return true;
+    return firebaseState.available;
 }
 
-// Inicializar Firebase Modular
-function initializeFirebase() {
-    try {
-        console.log("🎯 Inicializando Firebase Modular v10...");
-        
-        // Verificar disponibilidad
-        firebaseAvailable = checkFirebaseAvailability();
-        
-        if (!firebaseAvailable) {
-            console.warn("⚠️ Firebase Modular NO disponible. Usando modo local.");
-            
-            // Esperar un momento por si Firebase se carga después
-            setTimeout(() => {
-                firebaseAvailable = checkFirebaseAvailability();
-                if (firebaseAvailable) {
-                    setupAuthObserver();
-                } else {
-                    loadUserFromStorage();
-                }
-            }, 1000);
-            
-            loadUserFromStorage();
-            return;
-        }
-        
-        // Asignar módulos de Firebase
-        auth = window.firebaseAuth;
-        db = window.firebaseDb;
-        firebaseModules = window.firebaseModules;
-        
-        console.log("✅ Firebase Modular disponible, configurando observador...");
-        setupAuthObserver();
-        
-    } catch (error) {
-        console.error("❌ Error inicializando Firebase Modular:", error);
-        firebaseAvailable = false;
-        loadUserFromStorage();
+// Helper para usar Firebase de forma segura
+function useFirebase() {
+    const shouldCheck = !firebaseState.lastChecked || 
+                       (Date.now() - firebaseState.lastChecked) > 10000;
+    
+    if (shouldCheck) {
+        updateFirebaseState();
     }
+    
+    return {
+        isAvailable: firebaseState.available,
+        auth: firebaseState.auth,
+        db: firebaseState.db,
+        modules: firebaseState.modules,
+        
+        async safeOperation(operationName, operation, fallback) {
+            if (!firebaseState.available) {
+                console.warn(`Firebase no disponible para: ${operationName}`);
+                return typeof fallback === 'function' ? await fallback() : fallback;
+            }
+            
+            try {
+                const result = await operation();
+                return result;
+            } catch (error) {
+                console.error(`Error en ${operationName}:`, error.code || error.message);
+                
+                if (error.code?.includes('network') || error.code?.includes('unavailable')) {
+                    firebaseState.available = false;
+                    firebaseState.lastChecked = Date.now();
+                }
+                
+                return typeof fallback === 'function' ? await fallback() : fallback;
+            }
+        }
+    };
+}
+
+// Verificar si un usuario es administrador
+async function checkIfUserIsAdmin(email) {
+    if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        return true;
+    }
+    
+    const firebase = useFirebase();
+    
+    return await firebase.safeOperation(
+        'check-admin',
+        async () => {
+            const adminDoc = await firebase.modules.getDoc(
+                firebase.modules.doc(firebase.db, 'admins', email.toLowerCase())
+            );
+            return adminDoc.exists();
+        },
+        false
+    );
 }
 
 // Guardar/Actualizar usuario en Firestore
 async function saveUserToFirestore(user) {
-    if (!firebaseAvailable || !db) {
-        console.log("⚠️ Firestore no disponible, omitiendo guardado en Firestore");
-        return;
-    }
-
-    try {
-        const userRef = firebaseModules.doc(db, 'users', user.uid);
-        const userSnap = await firebaseModules.getDoc(userRef);
-        
-        if (!userSnap.exists()) {
-            // Crear nuevo usuario
-            await firebaseModules.setDoc(userRef, {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || user.email.split('@')[0],
-                photoURL: user.photoURL || null,
-                provider: user.providerData?.[0]?.providerId || 'email',
-                role: 'student',
-                progress: {
-                    level: 1,
-                    percentage: 0,
-                    lessons: 0
-                },
-                createdAt: firebaseModules.serverTimestamp(),
-                lastLogin: firebaseModules.serverTimestamp()
-            });
-            console.log("✅ Usuario creado en Firestore:", user.uid);
-        } else {
-            // Actualizar último login
-            await firebaseModules.updateDoc(userRef, {
-                lastLogin: firebaseModules.serverTimestamp()
-            });
-            console.log("✅ Usuario actualizado en Firestore:", user.uid);
-        }
-    } catch (error) {
-        console.error("❌ Error guardando usuario en Firestore:", error);
-    }
+    const firebase = useFirebase();
+    
+    return await firebase.safeOperation(
+        'save-user',
+        async () => {
+            const userRef = firebase.modules.doc(firebase.db, 'users', user.uid);
+            const userSnap = await firebase.modules.getDoc(userRef);
+            
+            const isAdmin = await checkIfUserIsAdmin(user.email);
+            
+            if (!userSnap.exists()) {
+                await firebase.modules.setDoc(userRef, {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    photoURL: user.photoURL || null,
+                    provider: user.providerData?.[0]?.providerId || 'email',
+                    role: isAdmin ? 'admin' : 'student',
+                    progress: {
+                        level: 1,
+                        percentage: 0,
+                        lessons: 0
+                    },
+                    createdAt: firebase.modules.serverTimestamp(),
+                    lastLogin: firebase.modules.serverTimestamp()
+                });
+                console.log("✅ Usuario creado en Firestore:", user.uid);
+            } else {
+                await firebase.modules.updateDoc(userRef, {
+                    lastLogin: firebase.modules.serverTimestamp()
+                });
+                console.log("✅ Usuario actualizado en Firestore:", user.uid);
+            }
+            return true;
+        },
+        false
+    );
 }
 
-// Configurar observador de autenticación
-function setupAuthObserver() {
-    try {
-        console.log("👁️ Configurando observador de autenticación...");
+// Inicializar Firebase
+function initializeFirebase() {
+    console.log("🎯 Inicializando Firebase...");
+    
+    updateFirebaseState();
+    
+    if (firebaseState.available) {
+        setupAuthObserver();
+        console.log("✅ Firebase inicializado correctamente");
+    } else {
+        console.log("⚠️ Firebase no disponible, usando modo local");
+        loadUserFromStorage();
         
-        firebaseModules.onAuthStateChanged(auth, async (user) => {
+        if (firebaseState.retryAttempts < firebaseState.maxRetries) {
+            firebaseState.retryAttempts++;
+            const retryDelay = firebaseState.retryAttempts * 2000;
+            
+            console.log(`Reintento ${firebaseState.retryAttempts} en ${retryDelay}ms...`);
+            
+            setTimeout(() => {
+                if (updateFirebaseState()) {
+                    setupAuthObserver();
+                }
+            }, retryDelay);
+        }
+    }
+    
+    setupConnectionListeners();
+}
+
+// Configurar listeners de conexión
+function setupConnectionListeners() {
+    window.addEventListener('online', () => {
+        console.log("📶 Conexión restaurada, verificando Firebase...");
+        updateFirebaseState();
+        if (firebaseState.available && !currentUser) {
+            setupAuthObserver();
+        }
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log("📶 Sin conexión, usando modo local");
+        firebaseState.available = false;
+    });
+}
+
+// ========== SISTEMA DE SINCRONIZACIÓN EN TIEMPO REAL ==========
+
+// Configurar observador de autenticación y sincronización
+function setupAuthObserver() {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable || !firebase.auth || !firebase.modules) {
+        console.log("⚠️ Firebase no disponible para observador");
+        return;
+    }
+    
+    try {
+        console.log("👁️ Configurando observador de autenticación y sincronización...");
+        
+        firebase.modules.onAuthStateChanged(firebase.auth, async (user) => {
             console.log("🔄 Cambio en estado de autenticación:", user ? `Usuario: ${user.email}` : "Sin usuario");
             
             if (user) {
-                // Guardar usuario en Firestore
+                // Guardar/Actualizar usuario en Firestore
                 await saveUserToFirestore(user);
-                handleFirebaseUser(user);
+                
+                // Manejar usuario y configurar sincronización en tiempo real
+                await handleFirebaseUser(user);
+                
+                // Configurar listener en tiempo real para cambios en el documento del usuario
+                setupUserRealtimeListener(user.uid);
             } else {
                 currentUser = null;
                 localStorage.removeItem('guitarraFacilUser');
                 updateUIForUser(null);
+                
+                // Limpiar listener de sincronización
+                cleanupRealtimeListeners();
             }
         });
         
@@ -199,21 +478,184 @@ function setupAuthObserver() {
         
     } catch (error) {
         console.error("❌ Error configurando observador:", error);
-        firebaseAvailable = false;
+        firebaseState.available = false;
     }
 }
 
-// Manejar usuario de Firebase Modular
-function handleFirebaseUser(user) {
-    console.log("👤 Procesando usuario de Firebase Modular:", user.email);
+// Configurar listener en tiempo real para cambios en el usuario
+let userListenerUnsubscribe = null;
+
+function setupUserRealtimeListener(userId) {
+    const firebase = useFirebase();
     
-    // Determinar rol (por defecto student, admin si el email contiene 'admin')
-    const isAdmin = user.email.includes('admin') || user.email === 'admin@demo.com';
+    if (!firebase.isAvailable || !firebase.db) {
+        console.log("📴 Modo offline - no se puede configurar listener en tiempo real");
+        return;
+    }
+    
+    try {
+        // Referencia al documento del usuario en Firestore
+        const userDocRef = firebase.modules.doc(firebase.db, 'users', userId);
+        
+        // Configurar listener en tiempo real
+        userListenerUnsubscribe = firebase.modules.onSnapshot(userDocRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const userData = docSnapshot.data();
+                console.log("🔄 Cambios detectados en usuario:", userData.email);
+                
+                // Actualizar usuario local con los nuevos datos
+                updateLocalUserWithFirestoreData(userData);
+                
+                // Actualizar la interfaz de usuario
+                updateUIWithRealTimeData(userData);
+                
+                // Mostrar notificación si hay cambios importantes
+                notifyUserChanges(userData);
+            }
+        }, (error) => {
+            console.error("❌ Error en listener de usuario en tiempo real:", error);
+        });
+        
+        console.log("✅ Listener en tiempo real configurado para usuario:", userId);
+        
+    } catch (error) {
+        console.error("❌ Error configurando listener en tiempo real:", error);
+    }
+}
+
+// Limpiar listeners de sincronización
+function cleanupRealtimeListeners() {
+    if (userListenerUnsubscribe) {
+        userListenerUnsubscribe();
+        userListenerUnsubscribe = null;
+        console.log("🧹 Listener de usuario en tiempo real limpiado");
+    }
+}
+
+// Actualizar usuario local con datos de Firestore
+function updateLocalUserWithFirestoreData(userData) {
+    // Guardar en localStorage
+    const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
+    
+    const updatedUser = {
+        ...savedUser,
+        ...userData,
+        // Mantener propiedades que no están en Firestore
+        isFirebaseUser: savedUser.isFirebaseUser !== undefined ? savedUser.isFirebaseUser : true,
+        firstName: userData.displayName ? userData.displayName.split(' ')[0] : savedUser.firstName,
+        name: userData.displayName || savedUser.name,
+        email: userData.email || savedUser.email,
+        role: userData.role || savedUser.role,
+        progress: userData.progress || savedUser.progress
+    };
+    
+    // Actualizar fecha de createdAt si existe
+    if (userData.createdAt && userData.createdAt.toDate) {
+        updatedUser.createdAt = userData.createdAt.toDate().toISOString();
+    }
+    
+    // Actualizar fecha de lastLogin si existe
+    if (userData.lastLogin && userData.lastLogin.toDate) {
+        updatedUser.lastLogin = userData.lastLogin.toDate().toISOString();
+    }
+    
+    localStorage.setItem('guitarraFacilUser', JSON.stringify(updatedUser));
+    currentUser = updatedUser;
+    
+    console.log("📱 Usuario local actualizado desde Firestore");
+}
+
+// Actualizar interfaz con datos en tiempo real
+function updateUIWithRealTimeData(userData) {
+    // Actualizar nombre en la barra de navegación
+    const userNameElement = document.getElementById('user-name');
+    if (userNameElement && userData.displayName) {
+        const firstName = userData.displayName.split(' ')[0];
+        if (userNameElement.textContent !== firstName) {
+            userNameElement.textContent = firstName;
+            console.log("👤 Nombre actualizado en tiempo real:", firstName);
+        }
+    }
+    
+    // Actualizar avatar si hay photoURL
+    if (userData.photoURL && userAvatar) {
+        userAvatar.src = userData.photoURL;
+        userAvatar.style.display = 'block';
+        const avatarContainer = document.getElementById('user-avatar-container');
+        if (avatarContainer && !avatarContainer.querySelector('img')) {
+            avatarContainer.innerHTML = '';
+            avatarContainer.appendChild(userAvatar);
+        }
+    }
+    
+    // Actualizar mensajes de bienvenida
+    const updates = [
+        { id: 'user-name', value: userData.displayName?.split(' ')[0] || '' },
+        { id: 'admin-welcome-name', value: userData.displayName || '' },
+        { id: 'student-welcome-name', value: userData.displayName?.split(' ')[0] || '' },
+        { id: 'admin-username', value: userData.displayName || '' },
+        { id: 'admin-email', value: userData.email || '' }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element && element.textContent !== update.value) {
+            element.textContent = update.value;
+        }
+    });
+    
+    // Actualizar progreso del estudiante si existe
+    if (userData.progress) {
+        const progressUpdates = [
+            { id: 'student-level', value: userData.progress.level || 1 },
+            { id: 'student-progress', value: `${userData.progress.percentage || 0}%` },
+            { id: 'student-lessons', value: userData.progress.lessons || 0 }
+        ];
+        
+        progressUpdates.forEach(update => {
+            const element = document.getElementById(update.id);
+            if (element && element.textContent !== String(update.value)) {
+                element.textContent = update.value;
+            }
+        });
+    }
+    
+    // Actualizar visibilidad de admin
+    const isAdmin = userData.role === 'admin';
+    uiUpdater.updateAdminVisibility(isAdmin);
+}
+
+// Notificar al usuario sobre cambios importantes
+function notifyUserChanges(userData) {
+    const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
+    
+    // Notificar cambio de rol
+    if (savedUser.role !== userData.role) {
+        const roleMessage = userData.role === 'admin' ? 
+            '¡Ahora eres administrador!' : 'Tu rol ha cambiado a estudiante';
+        showNotification(`🔄 ${roleMessage}`, 'info');
+    }
+    
+    // Notificar progreso significativo
+    if (userData.progress && savedUser.progress) {
+        const progressDiff = (userData.progress.percentage || 0) - (savedUser.progress.percentage || 0);
+        if (progressDiff >= 10) {
+            showNotification(`🎉 ¡Progreso actualizado! Ahora estás al ${userData.progress.percentage}%`, 'success');
+        }
+    }
+}
+
+// Manejar usuario de Firebase
+async function handleFirebaseUser(user) {
+    console.log("👤 Procesando usuario de Firebase:", user.email);
+    
+    const isAdmin = await checkIfUserIsAdmin(user.email);
     
     currentUser = {
         uid: user.uid,
         email: user.email,
         name: user.displayName || user.email.split('@')[0],
+        firstName: user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0],
         role: isAdmin ? 'admin' : 'student',
         isFirebaseUser: true,
         emailVerified: user.emailVerified,
@@ -221,19 +663,16 @@ function handleFirebaseUser(user) {
         provider: user.providerData?.[0]?.providerId || 'email'
     };
     
-    // Formatear nombre
     if (!user.displayName && user.email) {
         const nameFromEmail = user.email.split('@')[0];
         currentUser.name = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
+        currentUser.firstName = currentUser.name.split(' ')[0];
     }
     
-    // Guardar en localStorage
     localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
-    
-    // Actualizar UI
     updateUIForUser(currentUser);
     
-    console.log("✅ Usuario procesado:", currentUser.name, "Rol:", currentUser.role, "Proveedor:", currentUser.provider);
+    console.log("✅ Usuario procesado:", currentUser.firstName, "Rol:", currentUser.role);
 }
 
 // Cargar usuario desde localStorage
@@ -241,46 +680,111 @@ function loadUserFromStorage() {
     const savedUser = localStorage.getItem('guitarraFacilUser');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
+        
+        if (!currentUser.firstName && currentUser.name) {
+            currentUser.firstName = currentUser.name.split(' ')[0];
+        }
+        
         updateUIForUser(currentUser);
         console.log("📂 Usuario cargado desde localStorage:", currentUser.email);
     }
 }
 
-// Actualizar UI según usuario
-function updateUIForUser(user) {
-    if (user) {
-        authButtons.style.display = 'none';
-        userInfo.style.display = 'flex';
-        userName.textContent = user.name;
-        userRole.textContent = user.role === 'admin' ? 'Administrador' : 'Estudiante';
-        userRole.className = 'role-badge ' + (user.role === 'admin' ? 'role-admin' : 'role-student');
+// UI Updater
+const uiUpdater = {
+    updateUserInfo(user) {
+        if (!user) {
+            this.showAuthButtons();
+            this.hideUserInfo();
+            return;
+        }
         
-        // Mostrar contenido específico
+        this.hideAuthButtons();
+        this.showUserInfo(user);
+        this.updateAvatar(user);
+        this.updateWelcomeMessages(user);
+    },
+    
+    updateAvatar(user) {
+        if (!userAvatarContainer) return;
+        
+        if (user.photoURL) {
+            userAvatar.src = user.photoURL;
+            userAvatar.style.display = 'block';
+            userAvatarContainer.innerHTML = '';
+            userAvatarContainer.appendChild(userAvatar);
+        } else {
+            const initial = (user.firstName || user.name).charAt(0).toUpperCase();
+            userAvatarContainer.innerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--primary-blue); color: white; font-weight: bold; font-size: 14px;">${initial}</div>`;
+        }
+    },
+    
+    updateWelcomeMessages(user) {
+        const updates = [
+            { id: 'user-name', value: user.firstName || user.name.split(' ')[0] },
+            { id: 'admin-welcome-name', value: user.name },
+            { id: 'student-welcome-name', value: user.firstName }
+        ];
+        
+        updates.forEach(update => {
+            const element = document.getElementById(update.id);
+            if (element) element.textContent = update.value;
+        });
+    },
+    
+    showAuthButtons() {
+        if (authButtons) authButtons.style.display = 'flex';
+    },
+    
+    hideAuthButtons() {
+        if (authButtons) authButtons.style.display = 'none';
+    },
+    
+    showUserInfo(user) {
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userName) userName.textContent = user.firstName || user.name.split(' ')[0];
+    },
+    
+    hideUserInfo() {
+        if (userInfo) userInfo.style.display = 'none';
+    },
+    
+    updateAdminVisibility(isAdmin) {
+        if (adminNavItem) {
+            adminNavItem.style.display = isAdmin ? 'block' : 'none';
+        }
+        
         const studentElements = document.querySelectorAll('.student-only');
         const adminElements = document.querySelectorAll('.admin-only');
         
-        if (user.role === 'admin') {
+        if (isAdmin) {
             studentElements.forEach(el => el.style.display = 'none');
             adminElements.forEach(el => el.style.display = 'block');
-            if (document.getElementById('admin-welcome-name')) {
-                document.getElementById('admin-welcome-name').textContent = user.name;
-            }
         } else {
             studentElements.forEach(el => el.style.display = 'block');
             adminElements.forEach(el => el.style.display = 'none');
-            if (document.getElementById('student-welcome-name')) {
-                document.getElementById('student-welcome-name').textContent = user.name;
-            }
         }
+    }
+};
+
+// Actualizar UI según usuario
+async function updateUIForUser(user) {
+    if (user) {
+        uiUpdater.updateUserInfo(user);
         
-        // Actualizar estadísticas del estudiante
-        if (user.role === 'student') {
+        const isAdmin = await checkIfUserIsAdmin(user.email);
+        uiUpdater.updateAdminVisibility(isAdmin);
+        
+        if (!isAdmin) {
             updateStudentStats();
         }
     } else {
-        authButtons.style.display = 'flex';
-        userInfo.style.display = 'none';
-        document.querySelectorAll('.student-only, .admin-only').forEach(el => el.style.display = 'none');
+        uiUpdater.updateUserInfo(null);
+        uiUpdater.updateAdminVisibility(false);
+        
+        document.querySelectorAll('.student-only, .admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
     }
 }
 
@@ -289,15 +793,71 @@ function updateStudentStats() {
     const userData = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
     const progress = userData.progress || { level: 1, percentage: 0, lessons: 0 };
     
-    if (document.getElementById('student-level')) {
-        document.getElementById('student-level').textContent = progress.level;
-    }
-    if (document.getElementById('student-progress')) {
-        document.getElementById('student-progress').textContent = `${progress.percentage}%`;
-    }
-    if (document.getElementById('student-lessons')) {
-        document.getElementById('student-lessons').textContent = progress.lessons;
-    }
+    const updates = [
+        { id: 'student-level', value: progress.level },
+        { id: 'student-progress', value: `${progress.percentage}%` },
+        { id: 'student-lessons', value: progress.lessons }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element) element.textContent = update.value;
+    });
+}
+
+// Login local (usuarios demo)
+function handleLocalLogin(email, password) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const demoCredentials = [
+                { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
+                { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
+                { email: 'jv4491816@gmail.com', password: '123456', name: 'Juan Villar', role: 'admin' },
+                { email: 'fraylingay@gmail.com', password: '123456', name: 'Fraylingay', role: 'admin' },
+                { email: 'usuario@demo.com', password: '123456', name: 'Usuario Regular', role: 'student' }
+            ];
+            
+            const user = demoCredentials.find(
+                cred => cred.email === email && cred.password === password
+            );
+            
+            if (user) {
+                currentUser = {
+                    ...user,
+                    firstName: user.name.split(' ')[0]
+                };
+                localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+                updateUIForUser(currentUser);
+                resolve(currentUser);
+            } else {
+                reject(new Error('Email o contraseña incorrectos'));
+            }
+        }, 1000);
+    });
+}
+
+// Registro local
+function handleLocalSignup(name, email, password) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+            
+            currentUser = {
+                name: name,
+                firstName: name.split(' ')[0],
+                email: email,
+                role: isAdmin ? 'admin' : 'student',
+                progress: { level: 1, percentage: 0, lessons: 0 },
+                createdAt: new Date().toISOString(),
+                isLocalUser: true
+            };
+            
+            localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+            updateUIForUser(currentUser);
+            
+            resolve(currentUser);
+        }, 1000);
+    });
 }
 
 // Cargar formulario en el modal
@@ -390,12 +950,47 @@ function loadForm(formType) {
                     <label for="modalSignupPassword">Contraseña</label>
                     <div class="modal-input-with-icon" id="modalSignupPasswordContainer">
                         <i class="fas fa-lock"></i>
-                        <input type="password" id="modalSignupPassword" placeholder="Crea una contraseña segura (mínimo 6 caracteres)" required>
-                        <button type="button" id="toggleSignupPasswordBtn" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
+                        <input type="password" id="modalSignupPassword" 
+                               placeholder="Crea una contraseña segura (mínimo 8 caracteres)" 
+                               required 
+                               oninput="validatePasswordStrength()">
+                        <button type="button" id="toggleSignupPasswordBtn" 
+                                style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
+                    <div id="passwordStrength" style="margin-top: 5px; font-size: 0.8rem;">
+                        <div id="passwordRules">
+                            <div id="ruleLength" style="color: var(--accent-red);">✓ Mínimo 8 caracteres</div>
+                            <div id="ruleUpper" style="color: var(--accent-red);">✓ 1 mayúscula</div>
+                            <div id="ruleLower" style="color: var(--accent-red);">✓ 1 minúscula</div>
+                            <div id="ruleNumber" style="color: var(--accent-red);">✓ 1 número</div>
+                            <div id="ruleSymbol" style="color: var(--accent-red);">✓ 1 símbolo</div>
+                        </div>
+                        <div id="passwordStrengthBar" style="height: 4px; background: #ccc; margin-top: 5px; border-radius: 2px; overflow: hidden;">
+                            <div id="strengthBar" style="height: 100%; width: 0%; background: var(--accent-red); transition: width 0.3s;"></div>
+                        </div>
+                    </div>
                     <span class="error-message" id="modalSignupPasswordError"></span>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modalSignupConfirmPassword">Confirmar Contraseña</label>
+                    <div class="modal-input-with-icon" id="modalSignupConfirmPasswordContainer">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="modalSignupConfirmPassword" 
+                               placeholder="Confirma tu contraseña" 
+                               required
+                               oninput="validatePasswordMatch()">
+                        <button type="button" id="toggleConfirmPasswordBtn" 
+                                style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--primary-blue); cursor: pointer;">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div id="passwordMatch" style="margin-top: 5px; font-size: 0.8rem;">
+                        <div id="matchStatus" style="color: var(--accent-red);">✓ Las contraseñas coinciden</div>
+                    </div>
+                    <span class="error-message" id="modalSignupConfirmPasswordError"></span>
                 </div>
                 
                 <button type="submit" id="modalSignupSubmitBtn" class="modal-submit-btn">
@@ -437,7 +1032,6 @@ function setupFormEvents() {
         const googleLoginBtn = document.getElementById('googleLoginBtn');
         const githubLoginBtn = document.getElementById('githubLoginBtn');
         
-        // Toggle password visibility
         if (togglePasswordBtn && passwordInput) {
             togglePasswordBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -446,7 +1040,6 @@ function setupFormEvents() {
             });
         }
         
-        // Switch to signup
         if (switchToSignup) {
             switchToSignup.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -455,7 +1048,6 @@ function setupFormEvents() {
             });
         }
         
-        // Forgot password
         if (forgotPassword) {
             forgotPassword.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -463,23 +1055,20 @@ function setupFormEvents() {
             });
         }
         
-        // Google Login
         if (googleLoginBtn) {
             googleLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGoogleLogin();
+                handleSocialLogin('google');
             });
         }
         
-        // GitHub Login
         if (githubLoginBtn) {
             githubLoginBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGithubLogin();
+                handleSocialLogin('github');
             });
         }
         
-        // Login form submission
         if (loginForm) {
             loginForm.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -489,12 +1078,14 @@ function setupFormEvents() {
     } else {
         const signupForm = document.getElementById('modalSignupForm');
         const passwordInput = document.getElementById('modalSignupPassword');
+        const confirmPasswordInput = document.getElementById('modalSignupConfirmPassword');
         const togglePasswordBtn = document.getElementById('toggleSignupPasswordBtn');
+        const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPasswordBtn');
         const switchToLogin = document.getElementById('modalSwitchToLogin');
         const googleSignupBtn = document.getElementById('googleSignupBtn');
         const githubSignupBtn = document.getElementById('githubSignupBtn');
         
-        // Toggle password visibility
+        // Toggle para mostrar/ocultar contraseña principal
         if (togglePasswordBtn && passwordInput) {
             togglePasswordBtn.addEventListener('click', function() {
                 const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -503,7 +1094,24 @@ function setupFormEvents() {
             });
         }
         
-        // Switch to login
+        // Toggle para mostrar/ocultar confirmación de contraseña
+        if (toggleConfirmPasswordBtn && confirmPasswordInput) {
+            toggleConfirmPasswordBtn.addEventListener('click', function() {
+                const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                confirmPasswordInput.setAttribute('type', type);
+                this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+            });
+        }
+        
+        // Validación en tiempo real de contraseña
+        if (passwordInput) {
+            passwordInput.addEventListener('input', validatePasswordStrength);
+        }
+        
+        if (confirmPasswordInput) {
+            confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+        }
+        
         if (switchToLogin) {
             switchToLogin.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -512,23 +1120,20 @@ function setupFormEvents() {
             });
         }
         
-        // Google Signup
         if (googleSignupBtn) {
             googleSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGoogleLogin();
+                handleSocialLogin('google');
             });
         }
         
-        // GitHub Signup
         if (githubSignupBtn) {
             githubSignupBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                handleGithubLogin();
+                handleSocialLogin('github');
             });
         }
         
-        // Signup form submission
         if (signupForm) {
             signupForm.addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -538,210 +1143,134 @@ function setupFormEvents() {
     }
 }
 
-// Manejar login con Google
-async function handleGoogleLogin() {
-    if (!firebaseAvailable || !auth || !firebaseModules) {
-        alert('Firebase no está disponible. Por favor, usa el registro por email.');
+// Manejar login con redes sociales
+async function handleSocialLogin(providerType) {
+    const firebase = useFirebase();
+    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
+    
+    if (!submitBtn) return;
+    
+    const originalContent = submitBtn.innerHTML;
+    const originalDisabled = submitBtn.disabled;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Conectando con ${providerType === 'google' ? 'Google' : 'GitHub'}...`;
+    
+    if (!firebase.isAvailable) {
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
+        
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+            submitBtn.classList.remove('error-btn');
+            showNotification('Firebase no está disponible. Por favor, usa el registro por email.', 'error');
+        }, 1000);
         return;
     }
-
-    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
-    const originalContent = submitBtn ? submitBtn.innerHTML : null;
     
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con Google...';
-    }
-
     try {
-        const provider = new firebaseModules.GoogleAuthProvider();
-        const result = await firebaseModules.signInWithPopup(auth, provider);
+        const provider = providerType === 'google' 
+            ? new firebase.modules.GoogleAuthProvider()
+            : new firebase.modules.GithubAuthProvider();
+        
+        if (providerType === 'github') {
+            provider.addScope('read:user');
+            provider.addScope('user:email');
+        }
+        
+        const result = await firebase.modules.signInWithPopup(firebase.auth, provider);
         const user = result.user;
         
-        console.log("✅ Login con Google exitoso:", user.email);
+        console.log(`✅ Login con ${providerType} exitoso:`, user.email);
         
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-        }
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+        submitBtn.classList.add('success-btn');
         
         setTimeout(() => {
             closeModal();
         }, 1000);
         
     } catch (error) {
-        console.error('❌ Error en login con Google:', error);
+        console.error(`❌ Error en login con ${providerType}:`, error);
         
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
-        }
+        submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+        submitBtn.classList.add('error-btn');
         
-        let errorMessage = 'Error al conectar con Google';
+        let errorMessage = `Error al conectar con ${providerType === 'google' ? 'Google' : 'GitHub'}`;
         
-        if (error.code === 'auth/popup-closed-by-user') {
-            errorMessage = 'El popup de Google fue cerrado. Intenta de nuevo.';
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            errorMessage = 'La solicitud fue cancelada.';
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
-        }
+        const errorMessages = {
+            'auth/popup-closed-by-user': 'El popup fue cerrado. Intenta de nuevo.',
+            'auth/cancelled-popup-request': 'La solicitud fue cancelada.',
+            'auth/account-exists-with-different-credential': 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.',
+            'auth/operation-not-allowed': `La autenticación con ${providerType === 'google' ? 'Google' : 'GitHub'} no está habilitada.`
+        };
+        
+        errorMessage = errorMessages[error.code] || errorMessage;
         
         setTimeout(() => {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-            }
-            alert(errorMessage);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+            submitBtn.classList.remove('error-btn');
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar login con GitHub
-async function handleGithubLogin() {
-    if (!firebaseAvailable || !auth || !firebaseModules) {
-        alert('Firebase no está disponible. Por favor, usa el registro por email.');
-        return;
-    }
-
-    const submitBtn = document.getElementById('modalSubmitBtn') || document.getElementById('modalSignupSubmitBtn');
-    const originalContent = submitBtn ? submitBtn.innerHTML : null;
-    
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando con GitHub...';
-    }
-
-    try {
-        const provider = new firebaseModules.GithubAuthProvider();
-        // Añadir permisos de scope opcionales
-        provider.addScope('read:user');
-        provider.addScope('user:email');
-        
-        const result = await firebaseModules.signInWithPopup(auth, provider);
-        const user = result.user;
-        
-        console.log("✅ Login con GitHub exitoso:", user.email);
-        
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-        }
-        
-        setTimeout(() => {
-            closeModal();
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Error en login con GitHub:', error);
-        
-        if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
-        }
-        
-        let errorMessage = 'Error al conectar con GitHub';
-        
-        if (error.code === 'auth/popup-closed-by-user') {
-            errorMessage = 'El popup de GitHub fue cerrado. Intenta de nuevo.';
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            errorMessage = 'La solicitud fue cancelada.';
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            errorMessage = 'Ya existe una cuenta con el mismo email pero con otro método de autenticación.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-            errorMessage = 'La autenticación con GitHub no está habilitada. Contacta al administrador.';
-        }
-        
-        setTimeout(() => {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-            }
-            alert(errorMessage);
-        }, 1000);
-    }
-}
-
-// Manejar login con Firebase Modular
+// Manejar login
 async function handleLogin() {
     const email = document.getElementById('modalEmail')?.value.trim();
     const password = document.getElementById('modalPassword')?.value;
     const submitBtn = document.getElementById('modalSubmitBtn');
     
-    // Validaciones básicas
+    if (!submitBtn) return;
+    
     if (!email || !password) {
-        alert('Por favor, completa todos los campos');
+        showNotification('Por favor, completa todos los campos', 'error');
         return;
     }
     
-    // Actualizar UI del botón
-    submitBtn.disabled = true;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showNotification('Por favor, ingresa un email válido', 'error');
+        return;
+    }
+    
     const originalContent = submitBtn.innerHTML;
+    submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
     
     try {
-        console.log("🔑 Intentando login... Firebase disponible:", firebaseAvailable);
+        const firebase = useFirebase();
         
-        // PRIMERO intentar con Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability()) {
-            console.log("✅ Usando Firebase Modular para login...");
-            
-            const userCredential = await firebaseModules.signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            console.log("✅ Login exitoso con Firebase Modular:", user.email);
-            
-            // Éxito con Firebase
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
-            submitBtn.classList.add('success-btn');
-            
-            setTimeout(() => {
-                closeModal();
-            }, 1000);
-            return;
-        }
-        
-        // SI NO, usar login local (usuarios demo)
-        console.log("⚠️ Firebase Modular no disponible, usando login local...");
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Credenciales de demostración CORREGIDAS
-        const demoCredentials = [
-            { email: 'estudiante@demo.com', password: '123456', name: 'Estudiante Demo', role: 'student' },
-            { email: 'admin@demo.com', password: 'admin123', name: 'Administrador Demo', role: 'admin' },
-            { email: 'usuario@demo.com', password: '123456', name: 'Usuario Regular', role: 'student' }
-        ];
-        
-        const user = demoCredentials.find(
-            cred => cred.email === email && cred.password === password
-        );
-        
-        if (user) {
-            // Login exitoso con usuario demo
-            currentUser = user;
-            localStorage.setItem('guitarraFacilUser', JSON.stringify(user));
-            updateUIForUser(user);
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'login',
+                async () => {
+                    const userCredential = await firebase.modules.signInWithEmailAndPassword(
+                        firebase.auth, email, password
+                    );
+                    return userCredential.user;
+                },
+                async () => {
+                    return await handleLocalLogin(email, password);
+                }
+            );
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
             submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
                 closeModal();
-                console.log('✅ Login exitoso con usuario demo:', user.email);
             }, 1000);
+            
         } else {
-            // Credenciales incorrectas
-            submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
-            submitBtn.classList.add('error-btn');
+            await handleLocalLogin(email, password);
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Éxito!';
+            submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalContent;
-                submitBtn.classList.remove('error-btn');
-                alert('Email o contraseña incorrectos.\n\nUsuarios demo disponibles:\n• estudiante@demo.com / 123456\n• admin@demo.com / admin123\n• usuario@demo.com / 123456');
+                closeModal();
             }, 1000);
         }
         
@@ -753,44 +1282,49 @@ async function handleLogin() {
         
         let errorMessage = 'Error al iniciar sesión';
         
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-            errorMessage = 'Email o contraseña incorrectos';
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = 'Demasiados intentos. Intenta más tarde.';
-        }
+        const errorMessages = {
+            'auth/user-not-found': 'No existe una cuenta con este email',
+            'auth/wrong-password': 'Contraseña incorrecta',
+            'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
+            'Email o contraseña incorrectos': 'Email o contraseña incorrectos'
+        };
+        
+        errorMessage = errorMessages[error.message] || errorMessages[error.code] || errorMessage;
         
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage);
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar registro con Firebase Modular
+// Manejar registro
 async function handleSignup() {
     const name = document.getElementById('modalSignupName')?.value.trim();
     const email = document.getElementById('modalSignupEmail')?.value.trim();
     const password = document.getElementById('modalSignupPassword')?.value;
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value;
     const submitBtn = document.getElementById('modalSignupSubmitBtn');
     
-    console.log("📝 === DEBUG REGISTRO FIREBASE MODULAR ===");
-    console.log("Email:", email);
-    console.log("Firebase disponible:", firebaseAvailable);
-    console.log("checkFirebaseAvailability:", checkFirebaseAvailability());
-    console.log("auth disponible:", !!auth);
-    console.log("firebaseModules:", !!firebaseModules);
-    console.log("==========================");
+    if (!submitBtn) return;
     
-    // Validaciones básicas
-    if (!name || !email || !password) {
-        alert('Por favor, completa todos los campos');
+    // Validar campos requeridos
+    if (!name || !email || !password || !confirmPassword) {
+        showNotification('Por favor, completa todos los campos', 'error');
         return;
     }
     
-    if (password.length < 6) {
-        alert('La contraseña debe tener al menos 6 caracteres');
+    // Validar email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showNotification('Por favor, ingresa un email válido', 'error');
+        return;
+    }
+    
+    // Validar contraseña completa
+    if (!validateCompletePassword()) {
+        showNotification('Por favor, corrige los errores en la contraseña', 'error');
         return;
     }
     
@@ -799,58 +1333,49 @@ async function handleSignup() {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
     
     try {
-        // PRIMERO intentar con Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            console.log("🔥 Creando usuario en Firebase Modular...");
-            
-            const userCredential = await firebaseModules.createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            console.log("✅ Usuario creado en Firebase Modular:", user.uid);
-            console.log("📧 Email:", user.email);
-            
-            // Actualizar nombre en perfil
-            await firebaseModules.updateProfile(user, { displayName: name });
-            
-            // Enviar email de verificación
-            await firebaseModules.sendEmailVerification(user);
-            console.log("📧 Email de verificación enviado");
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'signup',
+                async () => {
+                    const userCredential = await firebase.modules.createUserWithEmailAndPassword(
+                        firebase.auth, email, password
+                    );
+                    const user = userCredential.user;
+                    
+                    await firebase.modules.updateProfile(user, { displayName: name });
+                    await firebase.modules.sendEmailVerification(user);
+                    
+                    return user;
+                },
+                async () => {
+                    return await handleLocalSignup(name, email, password);
+                }
+            );
             
             submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
             submitBtn.classList.add('success-btn');
             
             setTimeout(() => {
                 closeModal();
-                alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en Firebase.\n\nHemos enviado un email de verificación a:\n${email}\n\nPor favor verifica tu email.`);
+                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente. Hemos enviado un email de verificación.`, 'success');
             }, 1500);
             
-            return;
+        } else {
+            await handleLocalSignup(name, email, password);
+            
+            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
+            submitBtn.classList.add('success-btn');
+            
+            const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+            const roleMsg = isAdmin ? 'Administrador' : 'Estudiante';
+            
+            setTimeout(() => {
+                closeModal();
+                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente en modo local.\nEmail: ${email}\nRol: ${roleMsg}`, 'success');
+            }, 1000);
         }
-        
-        // SI NO, usar registro local
-        console.log("⚠️ Firebase Modular no disponible, usando registro local...");
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        currentUser = {
-            name: name,
-            email: email,
-            role: 'student',
-            progress: { level: 1, percentage: 0, lessons: 0 },
-            createdAt: new Date().toISOString(),
-            isLocalUser: true
-        };
-        
-        localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
-        updateUIForUser(currentUser);
-        
-        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
-        submitBtn.classList.add('success-btn');
-        
-        setTimeout(() => {
-            closeModal();
-            alert(`¡Bienvenido ${name}! 🎸\n\nCuenta creada exitosamente en modo local.\n\nEmail: ${email}\nContraseña: ${password}`);
-        }, 1000);
         
     } catch (error) {
         console.error('❌ Error en registro:', error);
@@ -860,66 +1385,95 @@ async function handleSignup() {
         
         let errorMessage = 'Error al crear la cuenta';
         
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = 'Este email ya está registrado';
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = 'Email inválido';
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = 'Contraseña muy débil (mínimo 6 caracteres)';
-        }
+        const errorMessages = {
+            'auth/email-already-in-use': 'Este email ya está registrado',
+            'auth/invalid-email': 'Email inválido',
+            'auth/weak-password': 'Contraseña muy débil. Debe tener al menos 8 caracteres con mayúsculas, minúsculas, números y símbolos.',
+            'auth/operation-not-allowed': 'El registro con email/contraseña no está habilitado'
+        };
+        
+        errorMessage = errorMessages[error.code] || errorMessage;
         
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
-            alert(errorMessage + '\n\nCódigo de error: ' + error.code);
+            showNotification(errorMessage, 'error');
         }, 1000);
     }
 }
 
-// Manejar "Olvidé mi contraseña" con Firebase Modular
+// Manejar "Olvidé mi contraseña"
 async function handleForgotPassword() {
     const email = prompt('Por favor, ingresa tu email para recuperar tu contraseña:');
     
     if (!email) return;
     
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert('Por favor, ingresa un email válido.');
+        showNotification('Por favor, ingresa un email válido.', 'error');
         return;
     }
     
     try {
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            await firebaseModules.sendPasswordResetEmail(auth, email);
-            alert(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`);
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'forgot-password',
+                async () => {
+                    await firebase.modules.sendPasswordResetEmail(firebase.auth, email);
+                    return true;
+                },
+                false
+            );
+            
+            showNotification(`✅ Se ha enviado un enlace de recuperación a:\n\n${email}\n\nRevisa tu bandeja de entrada.`, 'success');
+            
         } else {
-            alert(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}`);
+            showNotification(`⚠️ En modo local:\n\nSe simularía el envío de email a:\n\n${email}`, 'info');
         }
+        
     } catch (error) {
         console.error('Error al enviar email de recuperación:', error);
-        alert(`Error: ${error.message}`);
+        
+        const errorMessages = {
+            'auth/user-not-found': 'No existe una cuenta con este email',
+            'auth/invalid-email': 'Email inválido'
+        };
+        
+        const errorMessage = errorMessages[error.code] || error.message || 'Error al enviar el email';
+        showNotification(`Error: ${errorMessage}`, 'error');
     }
 }
 
-// Manejar logout con Firebase Modular
+// Manejar logout
 async function handleLogout() {
     try {
-        // Cerrar sesión en Firebase Modular si está disponible
-        if (firebaseAvailable && checkFirebaseAvailability() && auth && firebaseModules) {
-            await firebaseModules.signOut(auth);
-            console.log("✅ Sesión cerrada en Firebase Modular");
+        const firebase = useFirebase();
+        
+        // Limpiar listeners de sincronización
+        cleanupRealtimeListeners();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'logout',
+                async () => {
+                    await firebase.modules.signOut(firebase.auth);
+                    return true;
+                },
+                true
+            );
         }
         
-        // Limpiar datos locales
         currentUser = null;
         localStorage.removeItem('guitarraFacilUser');
         updateUIForUser(null);
         
-        alert('Sesión cerrada exitosamente. ¡Hasta pronto! 🎸');
+        showNotification('Sesión cerrada exitosamente. ¡Hasta pronto! 🎸', 'success');
         
     } catch (error) {
         console.error('Error al cerrar sesión:', error);
-        alert('Error al cerrar sesión: ' + error.message);
+        showNotification('Error al cerrar sesión. Intenta de nuevo.', 'error');
     }
 }
 
@@ -937,12 +1491,12 @@ function closeModal() {
     document.body.style.overflow = 'auto';
 }
 
-// Event Listeners
-if (studentLoginBtn) {
-    studentLoginBtn.addEventListener('click', () => openModal('login'));
+// Event Listeners de autenticación
+if (loginBtn) {
+    loginBtn.addEventListener('click', () => openModal('login'));
 }
-if (adminLoginBtn) {
-    adminLoginBtn.addEventListener('click', () => openModal('login'));
+if (registerBtn) {
+    registerBtn.addEventListener('click', () => openModal('signup'));
 }
 if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', closeModal);
@@ -966,35 +1520,1093 @@ if (loginModal) {
     });
 }
 
-// Inicializar Firebase Modular cuando se cargue la página
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM cargado, inicializando aplicación Firebase Modular...');
+// ========== SISTEMA DE MENSAJES DEL ADMIN CON FIRESTORE ==========
+
+// Estado de los mensajes
+let adminMessages = [];
+let messagesUnsubscribe = null;
+let isMessagesInitialized = false;
+
+// Colección de Firestore para mensajes
+const MESSAGES_COLLECTION = 'adminMessages';
+
+// Elementos del DOM de mensajes
+const askForm = document.getElementById('askForm');
+const messagesList = document.getElementById('messagesList');
+const emptyState = document.getElementById('emptyState');
+
+// Función para obtener la referencia a la colección de mensajes
+function getMessagesCollection() {
+    const firebase = useFirebase();
+    if (!firebase.isAvailable || !firebase.db) return null;
+    return firebase.modules.collection(firebase.db, MESSAGES_COLLECTION);
+}
+
+// Función para inicializar la sincronización de mensajes en tiempo real
+async function initMessagesSync() {
+    const firebase = useFirebase();
+    const syncStatus = document.getElementById('syncStatus');
     
-    // Esperar un momento para asegurar que Firebase se cargó
-    setTimeout(() => {
-        initializeFirebase();
-    }, 500);
+    if (!firebase.isAvailable) {
+        // Modo offline - usar localStorage
+        console.log('📴 Modo offline para mensajes');
+        if (syncStatus) {
+            syncStatus.innerHTML = '<i class="fas fa-circle sync-disconnected"></i> <span>Modo offline</span>';
+        }
+        loadMessagesFromLocalStorage();
+        return;
+    }
     
-    // Efecto de escritura en el hero
-    const heroText = document.querySelector('.hero h1');
-    if (heroText) {
-        const originalText = heroText.textContent;
-        heroText.textContent = '';
-        let i = 0;
+    const messagesCollection = getMessagesCollection();
+    if (!messagesCollection) {
+        console.error('❌ No se pudo obtener la colección de mensajes');
+        return;
+    }
+    
+    try {
+        // Ordenar por fecha de creación (más reciente primero)
+        const q = firebase.modules.query(
+            messagesCollection,
+            firebase.modules.orderBy('createdAt', 'desc')
+        );
         
-        function typeWriter() {
-            if (i < originalText.length) {
-                heroText.textContent += originalText.charAt(i);
-                i++;
-                setTimeout(typeWriter, 50);
-            }
+        // Configurar listener en tiempo real
+        messagesUnsubscribe = firebase.modules.onSnapshot(q, (snapshot) => {
+            adminMessages = [];
+            snapshot.forEach((doc) => {
+                const messageData = doc.data();
+                adminMessages.push({
+                    id: doc.id,
+                    ...messageData,
+                    // Convertir Firestore Timestamp a Date si existe
+                    createdAt: messageData.createdAt?.toDate?.() || new Date(messageData.createdAt),
+                    updatedAt: messageData.updatedAt?.toDate?.() || null
+                });
+            });
+            
+            // Actualizar UI
+            updateSyncStatus(true);
+            displayMessages();
+            updateMessageCount();
+            saveMessagesToLocalStorage();
+            
+            console.log(`✅ ${adminMessages.length} mensajes sincronizados`);
+        });
+        
+        console.log('🔗 Listener de mensajes configurado en tiempo real');
+        
+    } catch (error) {
+        console.error('❌ Error configurando listener de mensajes:', error);
+        updateSyncStatus(false);
+        loadMessagesFromLocalStorage();
+    }
+}
+
+// Actualizar estado de sincronización
+function updateSyncStatus(isConnected) {
+    const syncStatus = document.getElementById('syncStatus');
+    if (!syncStatus) return;
+    
+    if (isConnected) {
+        syncStatus.innerHTML = '<i class="fas fa-circle sync-connected"></i> <span>Sincronizado</span>';
+        syncStatus.querySelector('i').className = 'fas fa-circle sync-connected';
+    } else {
+        syncStatus.innerHTML = '<i class="fas fa-circle sync-disconnected"></i> <span>Sin conexión</span>';
+        syncStatus.querySelector('i').className = 'fas fa-circle sync-disconnected';
+    }
+}
+
+// Guardar mensajes en localStorage
+function saveMessagesToLocalStorage() {
+    try {
+        const messagesToSave = adminMessages.map(msg => ({
+            ...msg,
+            createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt,
+            updatedAt: msg.updatedAt instanceof Date ? msg.updatedAt.toISOString() : msg.updatedAt
+        }));
+        localStorage.setItem('adminMessages', JSON.stringify(messagesToSave));
+    } catch (error) {
+        console.error('❌ Error guardando mensajes en localStorage:', error);
+    }
+}
+
+// Cargar mensajes desde localStorage
+function loadMessagesFromLocalStorage() {
+    try {
+        const savedMessages = localStorage.getItem('adminMessages');
+        if (savedMessages) {
+            adminMessages = JSON.parse(savedMessages).map(msg => ({
+                ...msg,
+                createdAt: new Date(msg.createdAt),
+                updatedAt: msg.updatedAt ? new Date(msg.updatedAt) : null
+            }));
+            displayMessages();
+            updateMessageCount();
+            console.log(`📂 ${adminMessages.length} mensajes cargados desde localStorage`);
+        }
+    } catch (error) {
+        console.error('❌ Error cargando mensajes desde localStorage:', error);
+        adminMessages = [];
+    }
+}
+
+// Publicar nuevo mensaje en Firestore
+async function publishMessageToFirestore(messageData) {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - agregar al array local
+        const newMessage = {
+            id: Date.now().toString(),
+            ...messageData,
+            createdAt: new Date(),
+            isLocal: true
+        };
+        adminMessages.unshift(newMessage);
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return newMessage.id;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
         }
         
-        setTimeout(typeWriter, 500);
+        // Crear documento con ID automático
+        const newMessageRef = firebase.modules.doc(messagesCollection);
+        
+        const messageWithMetadata = {
+            ...messageData,
+            createdAt: firebase.modules.serverTimestamp(),
+            updatedAt: firebase.modules.serverTimestamp()
+        };
+        
+        await firebase.modules.setDoc(newMessageRef, messageWithMetadata);
+        
+        console.log('✅ Mensaje publicado en Firestore:', newMessageRef.id);
+        return newMessageRef.id;
+        
+    } catch (error) {
+        console.error('❌ Error publicando mensaje en Firestore:', error);
+        throw error;
     }
-});
+}
 
-// ========== AFINADOR MEJORADO (MISMO CÓDIGO) ==========
+// Eliminar mensaje de Firestore
+async function deleteMessageFromFirestore(messageId) {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - eliminar del array local
+        adminMessages = adminMessages.filter(msg => msg.id !== messageId);
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return true;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
+        }
+        
+        const messageRef = firebase.modules.doc(messagesCollection, messageId);
+        await firebase.modules.deleteDoc(messageRef);
+        
+        console.log('✅ Mensaje eliminado de Firestore:', messageId);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error eliminando mensaje de Firestore:', error);
+        throw error;
+    }
+}
+
+// Eliminar todos los mensajes de Firestore
+async function deleteAllMessagesFromFirestore() {
+    const firebase = useFirebase();
+    
+    if (!firebase.isAvailable) {
+        // Modo offline - limpiar array local
+        adminMessages = [];
+        saveMessagesToLocalStorage();
+        displayMessages();
+        updateMessageCount();
+        return true;
+    }
+    
+    try {
+        const messagesCollection = getMessagesCollection();
+        if (!messagesCollection) {
+            throw new Error('No se pudo acceder a la colección de mensajes');
+        }
+        
+        // Obtener todos los mensajes
+        const snapshot = await firebase.modules.getDocs(messagesCollection);
+        
+        // Eliminar cada documento
+        const deletePromises = [];
+        snapshot.forEach((doc) => {
+            deletePromises.push(firebase.modules.deleteDoc(firebase.modules.doc(messagesCollection, doc.id)));
+        });
+        
+        await Promise.all(deletePromises);
+        
+        console.log(`✅ ${snapshot.size} mensajes eliminados de Firestore`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error eliminando todos los mensajes de Firestore:', error);
+        throw error;
+    }
+}
+
+// Función para formatear fecha relativa
+function formatRelativeTime(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 1) return 'Ahora mismo';
+    if (diffMins < 60) return `Hace ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`;
+    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+    if (diffDays < 7) return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+    
+    return date.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+// Obtener clase CSS para categoría
+function getCategoryClass(category) {
+    const categoryClasses = {
+        'general': 'category-general',
+        'tecnica': 'category-tecnica',
+        'consejo': 'category-consejo',
+        'anuncio': 'category-anuncio',
+        'mantenimiento': 'category-mantenimiento'
+    };
+    return categoryClasses[category] || 'category-general';
+}
+
+// Obtener ícono para categoría
+function getCategoryIcon(category) {
+    const categoryIcons = {
+        'general': 'fa-bullhorn',
+        'tecnica': 'fa-guitar',
+        'consejo': 'fa-lightbulb',
+        'anuncio': 'fa-exclamation-circle',
+        'mantenimiento': 'fa-tools'
+    };
+    return categoryIcons[category] || 'fa-bullhorn';
+}
+
+// Verificar si el usuario actual es admin
+function isCurrentUserAdmin() {
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    return userData && userData.role === 'admin';
+}
+
+// Mostrar los mensajes
+function displayMessages() {
+    if (!messagesList) return;
+    
+    messagesList.innerHTML = '';
+    
+    if (adminMessages.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    
+    if (emptyState) emptyState.style.display = 'none';
+    
+    adminMessages.forEach(message => {
+        const messageCard = document.createElement('div');
+        messageCard.className = 'question-card fade-in';
+        messageCard.dataset.id = message.id;
+        
+        // Formatear fecha
+        const date = message.createdAt instanceof Date ? message.createdAt : new Date(message.createdAt);
+        const formattedDate = date.toLocaleDateString('es-ES', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const relativeTime = formatRelativeTime(date);
+        const categoryClass = getCategoryClass(message.category || 'general');
+        const categoryIcon = getCategoryIcon(message.category || 'general');
+        
+        messageCard.innerHTML = `
+            <div class="question-header">
+                <h3 class="question-title">
+                    ${message.title}
+                    <span class="message-category-badge ${categoryClass}">
+                        <i class="fas ${categoryIcon}"></i> ${message.category || 'General'}
+                    </span>
+                </h3>
+                <div class="question-meta">
+                    <div class="question-author">
+                        <i class="fas fa-user-shield"></i> ${message.author}
+                        <span class="admin-badge">Admin</span>
+                    </div>
+                    <div class="question-date">
+                        <i class="far fa-calendar"></i> ${formattedDate}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="question-content">
+                ${message.content}
+            </div>
+            
+            <div class="message-timestamp">
+                <i class="far fa-clock"></i> ${relativeTime}
+                ${message.isLocal ? '<span style="color: var(--stage-3-color);"><i class="fas fa-exclamation-circle"></i> Pendiente de sincronizar</span>' : ''}
+            </div>
+            
+            <!-- BOTONES DE ACCIÓN (SOLO PARA ADMINS) -->
+            <div class="question-actions" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <button class="btn-outline delete-message-btn" data-id="${message.id}" style="padding: 5px 15px; font-size: 0.8rem;">
+                    <i class="fas fa-trash"></i> Eliminar Mensaje
+                </button>
+            </div>
+        `;
+        
+        messagesList.appendChild(messageCard);
+        
+        // Añadir evento para eliminar mensaje
+        const deleteBtn = messageCard.querySelector('.delete-message-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                deleteAdminMessage(message.id);
+            });
+        }
+    });
+    
+    // Actualizar visibilidad de botones de acción
+    updateMessageActionsVisibility();
+}
+
+// Actualizar contador de mensajes
+function updateMessageCount() {
+    const messageCount = document.getElementById('messageCount');
+    const liveMessageCount = document.getElementById('liveMessageCount');
+    
+    if (messageCount) {
+        messageCount.textContent = adminMessages.length;
+    }
+    if (liveMessageCount) {
+        liveMessageCount.textContent = adminMessages.length;
+    }
+}
+
+// Función para refrescar mensajes manualmente
+async function refreshMessages() {
+    const refreshBtn = document.querySelector('[onclick="refreshMessages()"]');
+    const originalContent = refreshBtn.innerHTML;
+    
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            // Forzar recarga desde Firestore
+            const messagesCollection = getMessagesCollection();
+            if (messagesCollection) {
+                const snapshot = await firebase.modules.getDocs(
+                    firebase.modules.query(messagesCollection, firebase.modules.orderBy('createdAt', 'desc'))
+                );
+                
+                adminMessages = [];
+                snapshot.forEach((doc) => {
+                    const messageData = doc.data();
+                    adminMessages.push({
+                        id: doc.id,
+                        ...messageData,
+                        createdAt: messageData.createdAt?.toDate?.() || new Date(messageData.createdAt),
+                    });
+                });
+                
+                displayMessages();
+                updateMessageCount();
+                saveMessagesToLocalStorage();
+                
+                showNotification(`✅ ${adminMessages.length} mensajes actualizados`, 'success');
+            }
+        } else {
+            showNotification('⚠️ Modo offline - usando mensajes locales', 'info');
+        }
+    } catch (error) {
+        console.error('❌ Error refrescando mensajes:', error);
+        showNotification('Error al actualizar mensajes', 'error');
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalContent;
+    }
+}
+
+// Función para eliminar un mensaje del admin
+async function deleteAdminMessage(messageId) {
+    // Verificar que el usuario sea admin
+    if (!isCurrentUserAdmin()) {
+        showNotification('Solo los administradores pueden eliminar mensajes', 'error');
+        return;
+    }
+    
+    if (!confirm('¿Estás seguro de que quieres eliminar este mensaje?\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        await deleteMessageFromFirestore(messageId);
+        showNotification('Mensaje eliminado correctamente', 'success');
+    } catch (error) {
+        console.error('❌ Error eliminando mensaje:', error);
+        showNotification('Error al eliminar el mensaje', 'error');
+    }
+}
+
+// Función para eliminar todos los mensajes
+window.deleteAllMessages = async function() {
+    if (!isCurrentUserAdmin()) {
+        showNotification('Solo los administradores pueden eliminar mensajes', 'error');
+        return;
+    }
+    
+    if (!confirm('¿Estás seguro de que quieres eliminar TODOS los mensajes?\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        await deleteAllMessagesFromFirestore();
+        showNotification('Todos los mensajes han sido eliminados', 'success');
+    } catch (error) {
+        console.error('❌ Error eliminando todos los mensajes:', error);
+        showNotification('Error al eliminar los mensajes', 'error');
+    }
+};
+
+// Formulario para nuevo mensaje
+if (askForm) {
+    askForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Verificar que el usuario sea admin
+        if (!isCurrentUserAdmin()) {
+            showNotification('Solo los administradores pueden publicar mensajes', 'error');
+            return;
+        }
+        
+        const messageTitle = document.getElementById('messageTitle').value.trim();
+        const messageContent = document.getElementById('messageContent').value.trim();
+        const messageCategory = document.getElementById('messageCategory').value;
+        const submitBtn = document.getElementById('submitMessageBtn');
+        
+        if (!messageTitle || !messageContent) {
+            showNotification('Por favor completa todos los campos', 'error');
+            return;
+        }
+        
+        // Obtener información del usuario actual
+        const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        
+        const originalContent = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+        
+        try {
+            const messageData = {
+                title: messageTitle,
+                content: messageContent,
+                category: messageCategory,
+                author: userData.name || 'Administrador',
+                authorEmail: userData.email,
+                authorId: userData.uid || 'local',
+                isAdmin: true
+            };
+            
+            await publishMessageToFirestore(messageData);
+            
+            // Limpiar formulario
+            askForm.reset();
+            
+            // Mostrar mensaje de éxito
+            showNotification('¡Mensaje publicado con éxito! Todos los usuarios lo verán.', 'success');
+            
+        } catch (error) {
+            console.error('❌ Error publicando mensaje:', error);
+            showNotification('Error al publicar el mensaje', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+        }
+    });
+}
+
+// Actualizar visibilidad del formulario según el rol
+function updateMessagesFormVisibility() {
+    const isAdmin = isCurrentUserAdmin();
+    const askSection = document.querySelector('.ask-section');
+    const studentMessage = document.querySelector('.student-only');
+    
+    if (askSection && studentMessage) {
+        if (isAdmin) {
+            askSection.style.display = 'block';
+            studentMessage.style.display = 'none';
+        } else {
+            askSection.style.display = 'none';
+            studentMessage.style.display = 'block';
+        }
+    }
+    
+    updateMessageActionsVisibility();
+}
+
+// Actualizar visibilidad de botones de acción
+function updateMessageActionsVisibility() {
+    const isAdmin = isCurrentUserAdmin();
+    const actionDivs = document.querySelectorAll('.question-actions');
+    
+    if (isAdmin) {
+        actionDivs.forEach(div => {
+            div.style.display = 'block';
+        });
+    } else {
+        actionDivs.forEach(div => {
+            div.style.display = 'none';
+        });
+    }
+}
+
+// Inicializar mensajes
+function initMessages() {
+    if (document.getElementById('foro')) {
+        console.log('💬 Inicializando sistema de mensajes...');
+        initMessagesSync();
+        updateMessagesFormVisibility();
+        isMessagesInitialized = true;
+    }
+}
+
+// ========== PANEL DE ADMINISTRACIÓN ==========
+let adminUsers = [];
+const userCache = {
+    cache: new Map(),
+    timeout: 2 * 60 * 1000,
+    
+    get(key) {
+        const item = this.cache.get(key);
+        if (!item) return null;
+        
+        if (Date.now() - item.timestamp > this.timeout) {
+            this.cache.delete(key);
+            return null;
+        }
+        
+        return item.data;
+    },
+    
+    set(key, data) {
+        this.cache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    },
+    
+    clear() {
+        this.cache.clear();
+    }
+};
+
+// Inicializar panel de administración
+function initAdminPanel() {
+    console.log("👑 Inicializando panel de administración...");
+    
+    // Verificar que el usuario actual es admin
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    if (!userData || userData.role !== 'admin') {
+        showNotification("⚠️ Acceso denegado. Solo administradores pueden acceder a esta página.", 'error');
+        showPage('index');
+        return;
+    }
+    
+    // Actualizar información del admin
+    const updates = [
+        { id: 'admin-username', value: userData.firstName || userData.name },
+        { id: 'admin-email', value: userData.email }
+    ];
+    
+    updates.forEach(update => {
+        const element = document.getElementById(update.id);
+        if (element) element.textContent = update.value;
+    });
+    
+    // Cargar usuarios
+    loadAllUsers();
+    
+    // Configurar búsqueda
+    const searchInput = document.getElementById('user-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterUsers);
+    }
+}
+
+// Cargar todos los usuarios
+async function loadAllUsers() {
+    const usersList = document.getElementById('users-list');
+    if (!usersList) return;
+    
+    const cachedUsers = userCache.get('allUsers');
+    if (cachedUsers) {
+        adminUsers = cachedUsers;
+        updateUsersTable();
+        updateAdminStats();
+        console.log("📦 Usuarios cargados desde caché");
+        return;
+    }
+    
+    usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Cargando usuarios...</td></tr>';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            const usersSnapshot = await firebase.modules.getDocs(
+                firebase.modules.collection(firebase.db, 'users')
+            );
+            
+            adminUsers = [];
+            usersSnapshot.forEach(doc => {
+                const userData = doc.data();
+                adminUsers.push({
+                    id: doc.id,
+                    ...userData,
+                    createdAt: userData.createdAt?.toDate() || new Date(),
+                    lastLogin: userData.lastLogin?.toDate() || null
+                });
+            });
+            
+            console.log(`✅ ${adminUsers.length} usuarios cargados desde Firestore`);
+            
+        } else {
+            adminUsers = [
+                {
+                    id: '1',
+                    email: 'jv4491816@gmail.com',
+                    displayName: 'Juan Villar',
+                    role: 'admin',
+                    createdAt: new Date('2024-01-01'),
+                    lastLogin: new Date(),
+                    photoURL: '',
+                    progress: { level: 5, percentage: 80, lessons: 25 }
+                },
+                {
+                    id: '2',
+                    email: 'fraylingay@gmail.com',
+                    displayName: 'Fraylingay',
+                    role: 'admin',
+                    createdAt: new Date('2024-01-02'),
+                    lastLogin: new Date(),
+                    progress: { level: 4, percentage: 70, lessons: 20 }
+                },
+                {
+                    id: '3',
+                    email: 'estudiante@demo.com',
+                    displayName: 'Estudiante Demo',
+                    role: 'student',
+                    createdAt: new Date('2024-01-03'),
+                    lastLogin: new Date(),
+                    progress: { level: 2, percentage: 40, lessons: 10 }
+                },
+                {
+                    id: '4',
+                    email: 'usuario@demo.com',
+                    displayName: 'Usuario Regular',
+                    role: 'student',
+                    createdAt: new Date('2024-01-04'),
+                    lastLogin: null,
+                    progress: { level: 1, percentage: 10, lessons: 2 }
+                }
+            ];
+            
+            console.log(`📋 ${adminUsers.length} usuarios demo cargados`);
+        }
+        
+        userCache.set('allUsers', adminUsers);
+        updateUsersTable();
+        updateAdminStats();
+        
+    } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--accent-red);"><i class="fas fa-exclamation-triangle"></i> Error al cargar usuarios</td></tr>';
+    }
+}
+
+// Actualizar tabla de usuarios
+function updateUsersTable() {
+    const usersList = document.getElementById('users-list');
+    if (!usersList || !adminUsers.length) {
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">No hay usuarios para mostrar</td></tr>';
+        return;
+    }
+    
+    const fragment = document.createDocumentFragment();
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    
+    adminUsers.forEach(user => {
+        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        const isCurrentUser = user.email === userData?.email;
+        const isAdmin = user.role === 'admin';
+        
+        const displayName = user.displayName || user.email.split('@')[0];
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        
+        const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
+        const lastAccess = user.lastLogin ? 
+            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+            'Nunca';
+        
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>
+                <div class="user-info-cell">
+                    <div class="user-avatar">
+                        ${user.photoURL ? 
+                            `<img src="${user.photoURL}" alt="${displayName}" class="user-avatar-img">` :
+                            `<span>${initials}</span>`
+                        }
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">
+                            ${displayName}
+                            ${isCurrentUser ? '<span class="user-you-badge">(Tú)</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>${user.email}</td>
+            <td>${registerDate}</td>
+            <td>${lastAccess}</td>
+            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <div class="user-actions">
+                    <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-icon-btn" onclick="toggleUserRole('${user.id}', '${user.email}')" title="${isAdmin ? 'Quitar Admin' : 'Hacer Admin'}">
+                        <i class="fas ${isAdmin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                    </button>
+                    ${!isCurrentUser ? `
+                        <button class="action-icon-btn delete" onclick="deleteUser('${user.id}', '${user.email}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        
+        fragment.appendChild(row);
+    });
+    
+    usersList.innerHTML = '';
+    usersList.appendChild(fragment);
+}
+
+// Actualizar estadísticas del admin
+function updateAdminStats() {
+    const totalUsers = adminUsers.length;
+    const activeUsers = adminUsers.filter(user => 
+        user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000)
+    ).length;
+    
+    const newToday = adminUsers.filter(user => 
+        user.createdAt.toDateString() === new Date().toDateString()
+    ).length;
+    
+    const studentCount = adminUsers.filter(user => user.role === 'student').length;
+    const adminCount = adminUsers.filter(user => user.role === 'admin').length;
+    
+    const stats = [
+        { id: 'total-users', value: totalUsers },
+        { id: 'active-users', value: activeUsers },
+        { id: 'new-today', value: newToday },
+        { id: 'student-count', value: studentCount },
+        { id: 'admin-count', value: adminCount },
+        { id: 'active-count', value: activeUsers },
+        { id: 'inactive-count', value: totalUsers - activeUsers }
+    ];
+    
+    stats.forEach(stat => {
+        const element = document.getElementById(stat.id);
+        if (element) element.textContent = stat.value;
+    });
+}
+
+// Filtrar usuarios por búsqueda
+function filterUsers() {
+    const searchTerm = document.getElementById('user-search').value.toLowerCase().trim();
+    const usersList = document.getElementById('users-list');
+    
+    if (!usersList) return;
+    
+    if (!searchTerm) {
+        updateUsersTable();
+        return;
+    }
+    
+    const filteredUsers = adminUsers.filter(user => 
+        user.email.toLowerCase().includes(searchTerm) ||
+        (user.displayName && user.displayName.toLowerCase().includes(searchTerm)) ||
+        user.role.toLowerCase().includes(searchTerm)
+    );
+    
+    if (filteredUsers.length === 0) {
+        usersList.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">No se encontraron usuarios</td></tr>';
+        return;
+    }
+    
+    const fragment = document.createDocumentFragment();
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    
+    filteredUsers.forEach(user => {
+        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        const isCurrentUser = user.email === userData?.email;
+        const isAdmin = user.role === 'admin';
+        
+        const displayName = user.displayName || user.email.split('@')[0];
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        
+        const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
+        const lastAccess = user.lastLogin ? 
+            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+            'Nunca';
+        
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>
+                <div class="user-info-cell">
+                    <div class="user-avatar">
+                        ${user.photoURL ? 
+                            `<img src="${user.photoURL}" alt="${displayName}" class="user-avatar-img">` :
+                            `<span>${initials}</span>`
+                        }
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">
+                            ${displayName}
+                            ${isCurrentUser ? '<span class="user-you-badge">(Tú)</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>${user.email}</td>
+            <td>${registerDate}</td>
+            <td>${lastAccess}</td>
+            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <div class="user-actions">
+                    <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="action-icon-btn" onclick="toggleUserRole('${user.id}', '${user.email}')" title="${isAdmin ? 'Quitar Admin' : 'Hacer Admin'}">
+                        <i class="fas ${isAdmin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                    </button>
+                    ${!isCurrentUser ? `
+                        <button class="action-icon-btn delete" onclick="deleteUser('${user.id}', '${user.email}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        
+        fragment.appendChild(row);
+    });
+    
+    usersList.innerHTML = '';
+    usersList.appendChild(fragment);
+}
+
+// Toggle rol de usuario
+async function toggleUserRole(userId, userEmail) {
+    if (!confirm(`¿Estás seguro de cambiar el rol de ${userEmail}?`)) {
+        return;
+    }
+    
+    const user = adminUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    const newRole = user.role === 'admin' ? 'student' : 'admin';
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'toggle-role',
+                async () => {
+                    await firebase.modules.updateDoc(
+                        firebase.modules.doc(firebase.db, 'users', userId),
+                        { role: newRole }
+                    );
+                    return true;
+                },
+                false
+            );
+        }
+        
+        user.role = newRole;
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        updateAdminStats();
+        
+        showNotification(`✅ Rol actualizado: ${userEmail} ahora es ${newRole === 'admin' ? 'administrador' : 'estudiante'}`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error cambiando rol:', error);
+        showNotification('Error al cambiar el rol del usuario', 'error');
+    }
+}
+
+// Editar usuario
+function editUser(userId) {
+    const user = adminUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    const newName = prompt('Nuevo nombre para el usuario:', user.displayName || '');
+    if (newName === null) return;
+    
+    if (newName.trim()) {
+        user.displayName = newName.trim();
+        userCache.set('allUsers', adminUsers);
+        updateUsersTable();
+        showNotification('✅ Nombre actualizado correctamente', 'success');
+    }
+}
+
+// Eliminar usuario
+async function deleteUser(userId, userEmail) {
+    if (!confirm(`¿Estás seguro de eliminar al usuario ${userEmail}?\nEsta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            await firebase.safeOperation(
+                'delete-user',
+                async () => {
+                    await firebase.modules.deleteDoc(
+                        firebase.modules.doc(firebase.db, 'users', userId)
+                    );
+                    return true;
+                },
+                false
+            );
+        }
+        
+        adminUsers = adminUsers.filter(u => u.id !== userId);
+        userCache.set('allUsers', adminUsers);
+        
+        updateUsersTable();
+        updateAdminStats();
+        
+        showNotification('✅ Usuario eliminado correctamente', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error eliminando usuario:', error);
+        showNotification('Error al eliminar el usuario', 'error');
+    }
+}
+
+// Enviar anuncio a todos los usuarios
+function sendAnnouncement() {
+    const message = prompt('Escribe el anuncio que quieres enviar a todos los usuarios:');
+    if (message && message.trim()) {
+        showNotification(`📢 Anuncio enviado a ${adminUsers.length} usuarios`, 'success');
+    }
+}
+
+// Exportar datos de usuarios
+function exportUsers() {
+    const csvContent = [
+        ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Estado'],
+        ...adminUsers.map(user => [
+            user.displayName || '',
+            user.email,
+            user.role === 'admin' ? 'Administrador' : 'Estudiante',
+            user.createdAt.toLocaleDateString(),
+            user.lastLogin ? user.lastLogin.toLocaleDateString() : 'Nunca',
+            user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000) ? 'Activo' : 'Inactivo'
+        ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `usuarios-guitarra-facil-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification(`✅ Datos exportados: ${adminUsers.length} usuarios`, 'success');
+}
+
+// Generar reporte mensual
+function generateReport() {
+    const today = new Date();
+    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    
+    const newThisMonth = adminUsers.filter(user => user.createdAt >= monthAgo).length;
+    const activeThisMonth = adminUsers.filter(user => user.lastLogin && user.lastLogin >= monthAgo).length;
+    
+    showNotification(`📊 Reporte Mensual:\n\n• Nuevos usuarios este mes: ${newThisMonth}\n• Usuarios activos este mes: ${activeThisMonth}\n• Total usuarios: ${adminUsers.length}\n• Administradores: ${adminUsers.filter(u => u.role === 'admin').length}\n• Estudiantes: ${adminUsers.filter(u => u.role === 'student').length}`, 'info');
+}
+
+// Respaldar base de datos
+function backupDatabase() {
+    const backupData = {
+        timestamp: new Date().toISOString(),
+        totalUsers: adminUsers.length,
+        users: adminUsers
+    };
+    
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-guitarra-facil-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('✅ Respaldo de base de datos generado y descargado', 'success');
+}
+
+// ========== AFINADOR MEJORADO ==========
+
 // Configuración de cuerdas
 const STRINGS = {
     'mi-high': {
@@ -1111,6 +2723,7 @@ function selectStringAfinador(stringType) {
 // Actualizar display según la cuerda seleccionada
 function updateStringDisplayAfinador() {
     const string = STRINGS[state.currentString];
+    
     if (elementsAfinador.targetFrequency) {
         elementsAfinador.targetFrequency.innerHTML = 
             `Frecuencia objetivo: <strong>${string.frequency} Hz</strong> (${string.note})`;
@@ -1130,7 +2743,7 @@ async function toggleMicrophoneAfinador() {
             await startListeningAfinador();
         } catch (error) {
             console.error('Error al acceder al micrófono:', error);
-            alert('No se pudo acceder al micrófono. Asegúrate de permitir el acceso.');
+            showNotification('No se pudo acceder al micrófono. Asegúrate de permitir el acceso.', 'error');
         }
     } else {
         stopListeningAfinador();
@@ -1161,12 +2774,7 @@ async function startListeningAfinador() {
         state.microphone.connect(state.analyser);
         
         state.isListening = true;
-        if (elementsAfinador.micStatus) {
-            elementsAfinador.micStatus.textContent = 'Desactivar Micrófono';
-        }
-        if (elementsAfinador.micToggle) {
-            elementsAfinador.micToggle.classList.add('listening');
-        }
+        updateAfinadorUI(true);
         
         const string = STRINGS[state.currentString];
         if (elementsAfinador.statusText) {
@@ -1179,37 +2787,15 @@ async function startListeningAfinador() {
         
     } catch (error) {
         console.error('Error en configuración de audio:', error);
-        alert('Error al acceder al micrófono. Asegúrate de que tu micrófono esté conectado y tengas permisos para usarlo.');
+        showNotification('Error al acceder al micrófono. Asegúrate de que tu micrófono esté conectado y tengas permisos para usarlo.', 'error');
         throw error;
     }
 }
 
 // Detener escucha por micrófono en el afinador
 function stopListeningAfinador() {
-    if (state.animationId) {
-        cancelAnimationFrame(state.animationId);
-        state.animationId = null;
-    }
-    
-    if (state.microphone) {
-        state.microphone.disconnect();
-        state.microphone = null;
-    }
-    
-    if (state.audioContext) {
-        state.audioContext.close();
-        state.audioContext = null;
-    }
-    
-    state.isListening = false;
-    state.frequencyHistory = [];
-    state.lastValidDetection = null;
-    if (elementsAfinador.micStatus) {
-        elementsAfinador.micStatus.textContent = 'Activar Micrófono';
-    }
-    if (elementsAfinador.micToggle) {
-        elementsAfinador.micToggle.classList.remove('listening');
-    }
+    cleanupAfinadorResources();
+    updateAfinadorUI(false);
     
     const string = STRINGS[state.currentString];
     if (elementsAfinador.statusText) {
@@ -1218,6 +2804,58 @@ function stopListeningAfinador() {
     
     resetDisplayAfinador();
     console.log('🎤 Micrófono desactivado');
+}
+
+// Limpiar recursos del afinador
+function cleanupAfinadorResources() {
+    // Cancelar animación
+    if (state.animationId) {
+        cancelAnimationFrame(state.animationId);
+        state.animationId = null;
+    }
+    
+    // Limpiar recursos de audio
+    if (state.microphone) {
+        try {
+            state.microphone.disconnect();
+            const stream = state.microphone.mediaStream;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        } catch (error) {
+            console.warn("Error desconectando micrófono:", error);
+        }
+        state.microphone = null;
+    }
+    
+    // Cerrar contexto de audio
+    if (state.audioContext) {
+        if (state.audioContext.state !== 'closed') {
+            state.audioContext.close().catch(console.error);
+        }
+        state.audioContext = null;
+    }
+    
+    // Limpiar estado
+    state.isListening = false;
+    state.frequencyHistory = [];
+    state.lastValidDetection = null;
+}
+
+// Actualizar UI del afinador
+function updateAfinadorUI(isListening) {
+    if (elementsAfinador.micStatus) {
+        elementsAfinador.micStatus.textContent = isListening ? 
+            'Desactivar Micrófono' : 'Activar Micrófono';
+    }
+    
+    if (elementsAfinador.micToggle) {
+        if (isListening) {
+            elementsAfinador.micToggle.classList.add('listening');
+        } else {
+            elementsAfinador.micToggle.classList.remove('listening');
+        }
+    }
 }
 
 // Resetear display del afinador
@@ -1275,7 +2913,7 @@ function analyzeAudioAfinador() {
     const dataArray = new Float32Array(bufferLength);
     state.analyser.getFloatTimeDomainData(dataArray);
     
-    // Detectar frecuencia (simplificado para demostración)
+    // Detectar frecuencia con algoritmo de autocorrelación
     const detection = detectFrequency(dataArray, state.audioContext.sampleRate);
     
     if (detection.valid) {
@@ -1292,7 +2930,7 @@ function analyzeAudioAfinador() {
     state.animationId = requestAnimationFrame(analyzeAudioAfinador);
 }
 
-// Función simplificada de detección de frecuencia
+// Función mejorada de detección de frecuencia por autocorrelación
 function detectFrequency(dataArray, sampleRate) {
     // Calcular energía de la señal
     let energy = 0;
@@ -1305,16 +2943,43 @@ function detectFrequency(dataArray, sampleRate) {
         return { valid: false, frequency: 0, strength: energy };
     }
     
-    // Para demostración: generar una frecuencia aleatoria cerca del objetivo
+    // Algoritmo básico de autocorrelación para detección de frecuencia
+    let bestR = 0;
+    let bestLag = 0;
+    
+    // Buscar periodicidad (solo en un rango razonable)
+    const minLag = Math.floor(sampleRate / STRINGS[state.currentString].range.high);
+    const maxLag = Math.floor(sampleRate / STRINGS[state.currentString].range.low);
+    
+    for (let lag = minLag; lag < maxLag && lag < dataArray.length / 2; lag++) {
+        let r = 0;
+        for (let i = 0; i < dataArray.length - lag; i++) {
+            r += dataArray[i] * dataArray[i + lag];
+        }
+        
+        if (r > bestR) {
+            bestR = r;
+            bestLag = lag;
+        }
+    }
+    
+    if (bestLag === 0 || bestR < 0.1) {
+        return { valid: false, frequency: 0, strength: energy };
+    }
+    
+    // Calcular frecuencia
+    const frequency = sampleRate / bestLag;
+    
+    // Verificar si está en el rango de la cuerda actual
     const string = STRINGS[state.currentString];
-    const randomOffset = (Math.random() - 0.5) * 20;
-    const simulatedFrequency = string.frequency + randomOffset;
-    const simulatedStrength = Math.min(energy * 10, 1);
+    if (frequency < string.range.low || frequency > string.range.high) {
+        return { valid: false, frequency: frequency, strength: energy };
+    }
     
     return { 
         valid: true, 
-        frequency: simulatedFrequency, 
-        strength: simulatedStrength 
+        frequency: frequency, 
+        strength: Math.min(energy * 10, 1) 
     };
 }
 
@@ -1404,7 +3069,8 @@ function updateDeviationDisplayAfinador(cents, string) {
     }
 }
 
-// ========== METRÓNOMO MEJORADO (MISMO CÓDIGO) ==========
+// ========== METRÓNOMO MEJORADO ==========
+
 // Variables del metrónomo
 let metronomo = {
     isPlaying: false,
@@ -1439,7 +3105,7 @@ function initMetronomo() {
         metronomo.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     } catch (error) {
         console.error('Error creando AudioContext:', error);
-        alert('Tu navegador no soporta la API de Audio necesaria para el metrónomo.');
+        showNotification('Tu navegador no soporta la API de Audio necesaria para el metrónomo.', 'error');
         return;
     }
     
@@ -1706,8 +3372,6 @@ function tapTempoMetronomo() {
             metronomoElements.tapTempoBtn.style.transform = 'scale(1)';
         }, 100);
     }
-    
-    console.log('👆 Tap Tempo registrado');
 }
 
 // Manejar teclado shortcuts del metrónomo
@@ -1742,15 +3406,60 @@ function handleMetronomoKeyboardShortcuts(e) {
     }
 }
 
-// Funciones de administración
+// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN ==========
 window.manageUsers = function() {
-    alert('🔧 Redirigiendo a gestión de usuarios...');
+    showPage('admin-panel-page');
 };
 
 window.manageContent = function() {
-    alert('📚 Redirigiendo a gestión de contenido...');
+    showNotification('📚 Redirigiendo a gestión de contenido...', 'info');
 };
 
 window.viewStatistics = function() {
-    alert('📊 Redirigiendo a estadísticas...');
+    showNotification('📊 Redirigiendo a estadísticas...', 'info');
 };
+
+window.loadAllUsers = loadAllUsers;
+window.sendAnnouncement = sendAnnouncement;
+window.exportUsers = exportUsers;
+window.generateReport = generateReport;
+window.backupDatabase = backupDatabase;
+window.refreshMessages = refreshMessages;
+
+// ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM cargado, inicializando aplicación...');
+    
+    // Inicializar Firebase
+    initializeFirebase();
+    
+    // Monitorear cambios en el estado del usuario para mensajes
+    let lastUserState = null;
+    setInterval(() => {
+        const currentUser = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        if (JSON.stringify(currentUser) !== JSON.stringify(lastUserState)) {
+            lastUserState = currentUser;
+            if (document.getElementById('foro')?.classList.contains('active')) {
+                updateMessagesFormVisibility();
+            }
+        }
+    }, 1000);
+    
+    // Efecto de escritura en el hero
+    const heroText = document.querySelector('.hero h1');
+    if (heroText) {
+        const originalText = heroText.textContent;
+        heroText.textContent = '';
+        let i = 0;
+        
+        function typeWriter() {
+            if (i < originalText.length) {
+                heroText.textContent += originalText.charAt(i);
+                i++;
+                setTimeout(typeWriter, 50);
+            }
+        }
+        
+        setTimeout(typeWriter, 500);
+    }
+});
