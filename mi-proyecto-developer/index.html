@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitarra Fácil - Aprende Guitarra desde Cero</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header y Navegación -->
+    <header>
+        <nav>
+            <div class="logo">
+                <i class="fas fa-guitar floating"></i>
+                <span>Guitarra Fácil</span>
+            </div>
+            
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#" class="nav-link active" data-page="index">Inicio</a></li>
+                <li><a href="#" class="nav-link" data-page="afinacion-tips">Afinación y Tips</a></li>
+                <li><a href="#" class="nav-link" data-page="metronomo">Metrónomo</a></li>
+                <li><a href="#" class="nav-link" data-page="partituras">Partituras</a></li>
+                <li><a href="#" class="nav-link" data-page="aprendizaje">Aprendizaje</a></li>
+                <li><a href="#" class="nav-link" data-page="guitarra">Guitarra</a></li>
+                
+                <!-- Panel Admin SOLO para usuarios admin -->
+                <li id="admin-nav-item" style="display: none;">
+                    <a href="#" class="nav-link" data-page="admin-panel-page">
+                        Administración
+                    </a>
+                </li>
+                
+                <li>
+                    <div class="auth-section">
+                        <div id="auth-buttons">
+                            <div class="login-options" style="display: flex; gap: 10px;">
+                                <button id="login-btn" class="btn-outline">Iniciar Sesión</button>
+                                <button id="register-btn" class="btn-admin">Registrarse</button>
+                            </div>
+                        </div>
+                        <div id="user-info" style="display: none; align-items: center; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" id="user-profile">
+                                <div id="user-avatar-container" style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.1);">
+                                    <img id="user-avatar" src="" alt="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                                </div>
+                                <span id="user-name" style="color: white; font-weight: 500;"></span>
+                            </div>
+                            <button id="logout-btn" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">Cerrar Sesión</button>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Modal de Login/Registro Mejorado -->
+    <div id="loginModal" class="modal">
+        <div class="modal-container">
+            <div class="modal-welcome-section">
+                <button class="modal-close-btn" id="modalCloseBtn">&times;</button>
+                <div class="modal-guitar-icon">
+                    <i class="fas fa-guitar"></i>
+                </div>
+                <h1>¡Hola!...Músico</h1>
+                <h2>Aprende Guitarra, <span class="highlight">Domina la Música</span></h2>
+                <p>Domina la guitarra y descubre el músico que llevas dentro. Aprende a tu ritmo con nuestros cursos especializados, desde principiante hasta avanzado.</p>
+                <div class="modal-nav-buttons">
+                    <button class="modal-nav-btn modal-signup-btn" id="modalSignupBtn">REGISTRARSE</button>
+                    <button class="modal-nav-btn modal-login-btn-nav" id="modalLoginBtn">INICIAR SESIÓN</button>
+                </div>
+            </div>
+            
+            <div class="modal-form-section" id="modalFormSection">
+                <!-- El contenido del formulario se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Página de Inicio -->
+        <div id="index" class="page active">
+            <section class="hero">
+                <div class="hero-content">
+                    <h1>Aprende Guitarra desde Cero</h1>
+                    <p>Domina la guitarra con herramientas profesionales, lecciones estructuradas y una comunidad que te apoya en cada paso.</p>
+                    <a href="#" class="btn" data-page="afinacion-tips">Comenzar a Aprender</a>
+                </div>
+            </section>
+
+            <!-- Dashboard para estudiantes -->
+            <div id="student-dashboard" class="student-dashboard student-only" style="display: none;">
+                <div class="dashboard-header">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <h3>Mi Progreso</h3>
+                </div>
+                <p>Bienvenido de vuelta, <span id="student-welcome-name" style="font-weight: 600; color: var(--primary-blue);"></span>!</p>
+                <div class="progress-info">
+                    <div class="progress-item">
+                        <p>Nivel Actual</p>
+                        <span id="student-level">1</span>
+                    </div>
+                    <div class="progress-item">
+                        <p>Progreso General</p>
+                        <span id="student-progress">0%</span>
+                    </div>
+                    <div class="progress-item">
+                        <p>Lecciones Completadas</p>
+                        <span id="student-lessons">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel de administración (en la página de inicio) -->
+            <div id="admin-panel" class="admin-panel admin-only" style="display: none;">
+                <div class="dashboard-header">
+                    <i class="fas fa-cog"></i>
+                    <h3>Panel de Administración</h3>
+                </div>
+                <p>Bienvenido, <span id="admin-welcome-name" style="font-weight: 600; color: var(--primary-blue);"></span></p>
+                <div class="admin-actions">
+                    <button class="btn" onclick="manageUsers()">Gestionar Usuarios</button>
+                    <button class="btn" onclick="manageContent()">Gestionar Contenido</button>
+                    <button class="btn" onclick="viewStatistics()">Ver Estadísticas</button>
+                </div>
+            </div>
+
+            <!-- Sección de características -->
+            <div class="section-title">
+                <h2>Herramientas para Tu Aprendizaje</h2>
+                <p>Todo lo que necesitas para dominar la guitarra en un solo lugar</p>
+            </div>
+
+            <section class="features">
+                <div class="feature-card" data-page="metronomo">
+                    <div class="feature-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3>Metrónomo Inteligente</h3>
+                    <p>Mantén el ritmo perfecto mientras practicas con nuestro metrónomo avanzado</p>
+                </div>
+                
+                <div class="feature-card" data-page="afinacion-tips">
+                    <div class="feature-icon">
+                        <i class="fas fa-music"></i>
+                    </div>
+                    <h3>Afinador Profesional</h3>
+                    <p>Afinación precisa y consejos expertos para mejorar tu técnica</p>
+                </div>
+                
+                <div class="feature-card" data-page="partituras">
+                    <div class="feature-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Biblioteca de Partituras</h3>
+                    <p>Canciones para todos los niveles, desde principiantes hasta avanzados</p>
+                </div>
+                
+                <div class="feature-card" data-page="aprendizaje">
+                    <div class="feature-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <h3>Sistema de Aprendizaje</h3>
+                    <p>Lecciones estructuradas de básico a intermedio con seguimiento de progreso</p>
+                </div>
+            </section>
+
+            <!-- Contenido exclusivo para estudiantes -->
+            <div class="student-only" style="display: none;">
+                <div class="section-title">
+                    <h2>Mis Lecciones</h2>
+                    <p>Continúa tu aprendizaje desde donde lo dejaste</p>
+                </div>
+                
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-play-circle"></i>
+                        </div>
+                        <h3>Continuar Aprendiendo</h3>
+                        <p>Retoma tu última lección y sigue tu progreso personalizado</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Mi Progreso Detallado</h3>
+                        <p>Analiza tu avance con estadísticas y gráficos interactivos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenido exclusivo para administradores -->
+            <div class="admin-only" style="display: none;">
+                <div class="section-title">
+                    <h2>Herramientas de Administración</h2>
+                    <p>Gestiona todos los aspectos de la plataforma</p>
+                </div>
+                
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>Gestión de Usuarios</h3>
+                        <p>Administra estudiantes, permisos y seguimiento de actividad</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <h3>Gestión de Contenido</h3>
+                        <p>Crea y actualiza lecciones, ejercicios y materiales educativos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Afinación y Tips con el Afinador Mejorado -->
+        <div id="afinacion-tips" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Afinador Profesional</h2>
+                <p>Afinación precisa para cada cuerda de tu guitarra</p>
+            </div>
+            
+            <div class="afinador-container">
+                <div class="afinador-header">
+                    <h1>Afinador Maximus</h1>
+                    <p class="afinador-subtitle">Afinador para 6 Cuerdas</p>
+                    <p class="target-frequency" id="targetFrequency">Frecuencia objetivo: <strong>329.63 Hz</strong> (Mi - E4)</p>
+                </div>
+
+                <div class="string-selector">
+                    <button class="string-btn mi-high active" data-string="mi-high" data-frequency="329.63" data-note="E4">
+                        <span class="string-number">1ª</span>
+                        <span class="string-note">MI</span>
+                    </button>
+                    <button class="string-btn si" data-string="si" data-frequency="246.94" data-note="B3">
+                        <span class="string-number">2ª</span>
+                        <span class="string-note">SI</span>
+                    </button>
+                    <button class="string-btn sol" data-string="sol" data-frequency="196.00" data-note="G3">
+                        <span class="string-number">3ª</span>
+                        <span class="string-note">SOL</span>
+                    </button>
+                    <button class="string-btn re" data-string="re" data-frequency="146.83" data-note="D3">
+                        <span class="string-number">4ª</span>
+                        <span class="string-note">RE</span>
+                    </button>
+                    <button class="string-btn la" data-string="la" data-frequency="110.00" data-note="A2">
+                        <span class="string-number">5ª</span>
+                        <span class="string-note">LA</span>
+                    </button>
+                    <button class="string-btn mi-low" data-string="mi-low" data-frequency="82.41" data-note="E2">
+                        <span class="string-number">6ª</span>
+                        <span class="string-note">MI</span>
+                    </button>
+                </div>
+
+                <div class="tuner-display">
+                    <div class="circle-indicator" id="circleIndicator">
+                        E4
+                    </div>
+                    
+                    <div class="deviation-display" id="deviationText">
+                        Selecciona una cuerda
+                    </div>
+                    
+                    <div class="frequency-display" id="frequencyDisplay">
+                        -- Hz
+                    </div>
+
+                    <div class="cents-display" id="centsDisplay">
+                        -- cents
+                    </div>
+
+                    <div class="signal-quality">
+                        <span>Señal:</span>
+                        <div class="quality-bar">
+                            <div class="quality-level" id="qualityLevel" style="width: 0%"></div>
+                        </div>
+                        <span id="qualityValue">0%</span>
+                    </div>
+
+                    <div class="needle-container">
+                        <div class="needle-scale">
+                            <div class="needle" id="needle"></div>
+                            <div class="needle-center"></div>
+                        </div>
+                        <div class="scale-marks">
+                            <span>-50</span>
+                            <span>-25</span>
+                            <span>0</span>
+                            <span>+25</span>
+                            <span>+50</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="afinador-controls">
+                    <button class="afinador-btn" id="micToggle">
+                        <span>🎤</span> <span id="micStatus">Activar Micrófono</span>
+                    </button>
+                </div>
+
+                <div class="afinador-status">
+                    <div id="statusText">Selecciona una cuerda y activa el micrófono</div>
+                </div>
+
+                <div class="afinador-instructions">
+                    <p><strong>Instrucciones:</strong></p>
+                    <p>1. <strong>Selecciona</strong> la cuerda que quieres afinar</p>
+                    <p>2. <strong>Activa el micrófono</strong> y permite el acceso</p>
+                    <p>3. <strong>Toca la cuerda seleccionada</strong> de tu guitarra</p>
+                    <p>4. <strong>Ajusta</strong> hasta que esté en <strong style="color:#2ecc71">VERDE</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página del Metrónomo Mejorado -->
+        <div id="metronomo" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Metrónomo Inteligente</h2>
+                <p>Mantén el ritmo perfecto en tus prácticas musicales</p>
+            </div>
+            
+            <div class="metronomo-container">
+                <div class="metronomo-card">
+                    <div class="bpm-display">
+                        <div class="bpm-value" id="bpmValue">120</div>
+                        <div class="bpm-label">PULSOS POR MINUTO</div>
+                    </div>
+                    
+                    <div class="bpm-control">
+                        <div class="slider-container">
+                            <input type="range" min="40" max="240" value="120" class="slider" id="bpmSlider">
+                            <div class="slider-labels">
+                                <span>40</span>
+                                <span>140</span>
+                                <span>240</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="controls-grid">
+                        <div class="control-group">
+                            <div class="control-label">COMPÁS</div>
+                            <input type="number" min="1" max="4" value="4" class="time-input" id="timeTop">
+                        </div>
+                        
+                        <div class="control-group">
+                            <div class="control-label">BPM</div>
+                            <div class="bpm-value" style="font-size: 2rem; color: var(--text-white);" id="currentBpm">120</div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <div class="control-label">SUBDIVISIÓN</div>
+                            <div class="subdivision-buttons" id="subdivisionButtons">
+                                <button class="subdivision-btn active" data-value="1">1/1</button>
+                                <button class="subdivision-btn" data-value="2">1/2</button>
+                                <button class="subdivision-btn" data-value="4">1/4</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="beat-display" id="beatDisplay">
+                        <!-- Las celdas de compás se generarán con JavaScript -->
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="action-btn start-btn" id="startBtn">
+                            <i class="fas fa-play"></i> Iniciar
+                        </button>
+                        <button class="action-btn stop-btn" id="stopBtn" disabled>
+                            <i class="fas fa-stop"></i> Detener
+                        </button>
+                    </div>
+                    
+                    <button class="tap-tempo-btn" id="tapTempoBtn">
+                        <i class="fas fa-hand-point-up"></i> Tap Tempo
+                    </button>
+                    
+                    <div class="shortcuts-info">
+                        <p><i class="fas fa-keyboard"></i> <strong>Atajos de teclado:</strong></p>
+                        <p>Espacio: Iniciar/Detener • Flechas ↑↓: Ajustar BPM • T: Tap Tempo</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Otras páginas -->
+        <div id="partituras" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Biblioteca de Partituras</h2>
+                <p>Encuentra canciones para todos los niveles y estilos musicales</p>
+            </div>
+            <div class="metronomo-container">
+                <div class="metronomo-card">
+                    <div style="text-align: center; padding: 2rem;">
+                        <i class="fas fa-file-alt" style="font-size: 3rem; color: var(--primary-blue); margin-bottom: 1rem;"></i>
+                        <h3 style="margin-bottom: 1rem; color: var(--text-white);">Colección Musical</h3>
+                        <p style="color: rgba(255, 255, 255, 0.8); max-width: 600px; margin: 0 auto;">Próximamente: Una extensa biblioteca con partituras, tablaturas y lecciones interactivas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="aprendizaje" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Sistema de Aprendizaje</h2>
+                <p>Aprende a tu ritmo con nuestro método estructurado</p>
+            </div>
+            <div class="metronomo-container">
+                <div class="metronomo-card">
+                    <div style="text-align: center; padding: 2rem;">
+                        <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--primary-blue); margin-bottom: 1rem;"></i>
+                        <h3 style="margin-bottom: 1rem; color: var(--text-white);">Cursos Estructurados</h3>
+                        <p style="color: rgba(255, 255, 255, 0.8); max-width: 600px; margin: 0 auto;">Próximamente: Lecciones paso a paso desde nivel básico hasta avanzado con seguimiento de progreso.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="guitarra" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Todo sobre la Guitarra</h2>
+                <p>Conoce todo sobre instrumentos, accesorios y mantenimiento</p>
+            </div>
+            <div class="metronomo-container">
+                <div class="metronomo-card">
+                    <div style="text-align: center; padding: 2rem;">
+                        <i class="fas fa-guitar" style="font-size: 3rem; color: var(--primary-blue); margin-bottom: 1rem;"></i>
+                        <h3 style="margin-bottom: 1rem; color: var(--text-white);">Guía Completa</h3>
+                        <p style="color: rgba(255, 255, 255, 0.8); max-width: 600px; margin: 0 auto;">Próximamente: Información detallada sobre guitarras, equipos, mantenimiento y técnicas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Panel de Administración (ID CORREGIDO) -->
+        <div id="admin-panel-page" class="page">
+            <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
+            <div class="section-title">
+                <h2>Panel de Administración</h2>
+                <p>Gestiona usuarios, contenido y estadísticas de la plataforma</p>
+            </div>
+            
+            <div class="admin-panel-container">
+                <!-- Header del Panel -->
+                <div class="admin-header">
+                    <div class="admin-welcome">
+                        <h3><i class="fas fa-user-shield"></i> Bienvenido, <span id="admin-username">Administrador</span></h3>
+                        <p id="admin-email"></p>
+                    </div>
+                    <div class="admin-stats">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-number" id="total-users">0</span>
+                                <span class="stat-label">Usuarios</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-music"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-number" id="active-users">0</span>
+                                <span class="stat-label">Activos</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-number" id="new-today">0</span>
+                                <span class="stat-label">Nuevos Hoy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gestión de Usuarios -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-user-cog"></i> Gestión de Usuarios</h3>
+                    <div class="admin-controls">
+                        <button class="admin-btn" onclick="loadAllUsers()">
+                            <i class="fas fa-sync-alt"></i> Actualizar Lista
+                        </button>
+                        <div class="search-box">
+                            <input type="text" id="user-search" placeholder="Buscar por email o nombre...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="users-table-container">
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Registro</th>
+                                    <th>Último Acceso</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list">
+                                <!-- Los usuarios se cargarán aquí -->
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 20px;">
+                                        <i class="fas fa-spinner fa-spin"></i> Cargando usuarios...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Herramientas Rápidas -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-tools"></i> Herramientas Rápidas</h3>
+                    <div class="tools-grid">
+                        <button class="tool-btn" onclick="sendAnnouncement()">
+                            <i class="fas fa-bullhorn"></i>
+                            <span>Enviar Anuncio</span>
+                        </button>
+                        <button class="tool-btn" onclick="exportUsers()">
+                            <i class="fas fa-file-export"></i>
+                            <span>Exportar Datos</span>
+                        </button>
+                        <button class="tool-btn" onclick="generateReport()">
+                            <i class="fas fa-chart-pie"></i>
+                            <span>Reporte Mensual</span>
+                        </button>
+                        <button class="tool-btn" onclick="backupDatabase()">
+                            <i class="fas fa-database"></i>
+                            <span>Respaldar BD</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estadísticas Avanzadas -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <h4>Actividad por Día</h4>
+                            <div class="activity-chart">
+                                <div class="chart-bar" style="height: 80%; background: var(--primary-blue);" title="Hoy: 80%"></div>
+                                <div class="chart-bar" style="height: 60%; background: var(--stage-2-color);" title="Ayer: 60%"></div>
+                                <div class="chart-bar" style="height: 40%; background: var(--stage-3-color);" title="Anteayer: 40%"></div>
+                                <div class="chart-bar" style="height: 70%; background: var(--accent-green);" title="Hace 3 días: 70%"></div>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <h4>Distribución de Roles</h4>
+                            <div class="role-distribution">
+                                <div class="role-item">
+                                    <span class="role-dot" style="background: var(--primary-blue);"></span>
+                                    <span>Estudiantes: <strong id="student-count">0</strong></span>
+                                </div>
+                                <div class="role-item">
+                                    <span class="role-dot" style="background: var(--stage-3-color);"></span>
+                                    <span>Administradores: <strong id="admin-count">0</strong></span>
+                                </div>
+                                <div class="role-item">
+                                    <span class="role-dot" style="background: var(--accent-green);"></span>
+                                    <span>Activos: <strong id="active-count">0</strong></span>
+                                </div>
+                                <div class="role-item">
+                                    <span class="role-dot" style="background: var(--accent-red);"></span>
+                                    <span>Inactivos: <strong id="inactive-count">0</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="logo">
+                <i class="fas fa-guitar"></i>
+                <span>Guitarra Fácil</span>
+            </div>
+            <p>Tu centro de aprendizaje musical moderno e interactivo. Domina la guitarra a tu ritmo.</p>
+            <div class="social-links">
+                <a href="#"><i class="fab fa-facebook"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+                <a href="#"><i class="fab fa-youtube"></i></a>
+                <a href="#"><i class="fab fa-tiktok"></i></a>
+            </div>
+            <p class="copyright">&copy; 2024 Guitarra Fácil. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Firebase SDK v10 Modular -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged,
+            updateProfile,
+            sendEmailVerification,
+            sendPasswordResetEmail,
+            GoogleAuthProvider,
+            GithubAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore,
+            doc,
+            setDoc,
+            getDoc,
+            updateDoc,
+            serverTimestamp,
+            collection,
+            getDocs,
+            query,
+            where
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        console.log("🚀 Firebase Modular v10 cargando...");
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3hn3WNnsINtpNao1iMUjqUzU_pcu6f_o",
+            authDomain: "guitarra-6f6a4.firebaseapp.com",
+            projectId: "guitarra-6f6a4",
+            storageBucket: "guitarra-6f6a4.firebasestorage.app",
+            messagingSenderId: "716244582906",
+            appId: "1:716244582906:web:ddd0941ab7c77c5fe0a443"
+        };
+
+        // Initialize Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            
+            console.log("✅ Firebase App inicializada:", app.name);
+            console.log("✅ Firebase Auth disponible");
+            console.log("✅ Firestore disponible");
+            
+            // Hacer disponible globalmente para main.js
+            window.firebaseAuth = auth;
+            window.firebaseApp = app;
+            window.firebaseDb = db;
+            window.firebaseModules = {
+                createUserWithEmailAndPassword,
+                signInWithEmailAndPassword,
+                signOut,
+                onAuthStateChanged,
+                updateProfile,
+                sendEmailVerification,
+                sendPasswordResetEmail,
+                GoogleAuthProvider,
+                GithubAuthProvider,
+                signInWithPopup,
+                // Firestore functions
+                doc,
+                setDoc,
+                getDoc,
+                updateDoc,
+                serverTimestamp,
+                collection,
+                getDocs,
+                query,
+                where
+            };
+            
+            window.firebaseReady = true;
+            console.log("🎉 Firebase Modular v10 listo para usar");
+            
+        } catch (error) {
+            console.error("❌ Error inicializando Firebase Modular:", error);
+            window.firebaseReady = false;
+        }
+    </script>
+    
+    <script src="js/main.js"></script>
+</body>
+</html>
