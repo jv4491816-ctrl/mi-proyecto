@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js para el gráfico de pastel -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Header y Navegación -->
@@ -52,6 +54,10 @@
                                 </div>
                                 <span id="user-name" style="color: white; font-weight: 500;"></span>
                             </div>
+                            <!-- Botón para cambiar nombre -->
+                            <button id="change-name-btn" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem; display: none;" title="Cambiar Nombre">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button id="logout-btn" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">Cerrar Sesión</button>
                         </div>
                     </div>
@@ -79,6 +85,32 @@
             
             <div class="modal-form-section" id="modalFormSection">
                 <!-- El contenido del formulario se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Cambiar Nombre -->
+    <div id="changeNameModal" class="modal">
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-form-section">
+                <button class="modal-close-btn" onclick="closeChangeNameModal()">&times;</button>
+                <div class="modal-form-header">
+                    <h2><i class="fas fa-user-edit"></i> Cambiar Nombre</h2>
+                    <p>Actualiza tu nombre de usuario</p>
+                </div>
+                <form id="changeNameForm">
+                    <div class="modal-form-group">
+                        <label for="newName">Nuevo Nombre</label>
+                        <div class="modal-input-with-icon">
+                            <i class="fas fa-user"></i>
+                            <input type="text" id="newName" placeholder="Ingresa tu nuevo nombre" required>
+                        </div>
+                        <span class="error-message" id="newNameError"></span>
+                    </div>
+                    <button type="submit" class="modal-submit-btn" id="changeNameSubmitBtn">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -588,8 +620,11 @@
                 <div class="admin-section">
                     <h3><i class="fas fa-user-cog"></i> Gestión de Usuarios</h3>
                     <div class="admin-controls">
-                        <button class="admin-btn" onclick="window.loadAllUsers()">
-                            <i class="fas fa-sync-alt"></i> Actualizar Lista
+                        <button class="admin-btn" onclick="refreshUsersList()">  <!-- CAMBIADO AQUÍ -->
+                            <i class="fas fa-sync-alt"></i> Actualizar / Recargar Lista
+                        </button>
+                        <button class="admin-btn" onclick="refreshCharts()">
+                            <i class="fas fa-chart-pie"></i> Refrescar Gráficos
                         </button>
                         <div class="search-box">
                             <input type="text" id="user-search" placeholder="Buscar por email o nombre...">
@@ -626,10 +661,6 @@
                 <div class="admin-section">
                     <h3><i class="fas fa-tools"></i> Herramientas Rápidas</h3>
                     <div class="tools-grid">
-                        <button class="tool-btn" onclick="window.sendAnnouncement()">
-                            <i class="fas fa-bullhorn"></i>
-                            <span>Enviar Anuncio</span>
-                        </button>
                         <button class="tool-btn" onclick="window.exportUsers()">
                             <i class="fas fa-file-export"></i>
                             <span>Exportar Datos</span>
@@ -645,39 +676,51 @@
                     </div>
                 </div>
 
-                <!-- Estadísticas Avanzadas -->
+                <!-- Estadísticas Avanzadas con Gráfico de Pastel -->
                 <div class="admin-section">
-                    <h3><i class="fas fa-chart-bar"></i> Estadísticas</h3>
+                    <h3><i class="fas fa-chart-pie"></i> Estadísticas de Usuarios</h3>
                     <div class="stats-grid">
                         <div class="stat-box">
-                            <h4>Actividad por Día</h4>
-                            <div class="activity-chart">
-                                <div class="chart-bar" style="height: 80%; background: var(--primary-blue);" title="Hoy: 80%"></div>
-                                <div class="chart-bar" style="height: 60%; background: var(--stage-2-color);" title="Ayer: 60%"></div>
-                                <div class="chart-bar" style="height: 40%; background: var(--stage-3-color);" title="Anteayer: 40%"></div>
-                                <div class="chart-bar" style="height: 70%; background: var(--accent-green);" title="Hace 3 días: 70%"></div>
+                            <h4>Distribución por Rol</h4>
+                            <div style="height: 200px; position: relative;">
+                                <canvas id="rolePieChart"></canvas>
                             </div>
-                        </div>
-                        <div class="stat-box">
-                            <h4>Distribución de Roles</h4>
-                            <div class="role-distribution">
+                            <div class="role-distribution" style="margin-top: 15px;">
                                 <div class="role-item">
-                                    <span class="role-dot" style="background: var(--primary-blue);"></span>
+                                    <span class="role-dot" style="background: #1a73e8;"></span>
                                     <span>Estudiantes: <strong id="student-count">0</strong></span>
                                 </div>
                                 <div class="role-item">
-                                    <span class="role-dot" style="background: var(--stage-3-color);"></span>
+                                    <span class="role-dot" style="background: #fbbc04;"></span>
                                     <span>Administradores: <strong id="admin-count">0</strong></span>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <h4>Estado de Actividad</h4>
+                            <div style="height: 200px; position: relative;">
+                                <canvas id="activityPieChart"></canvas>
+                            </div>
+                            <div class="role-distribution" style="margin-top: 15px;">
                                 <div class="role-item">
-                                    <span class="role-dot" style="background: var(--accent-green);"></span>
+                                    <span class="role-dot" style="background: #34a853;"></span>
                                     <span>Activos: <strong id="active-count">0</strong></span>
                                 </div>
                                 <div class="role-item">
-                                    <span class="role-dot" style="background: var(--accent-red);"></span>
+                                    <span class="role-dot" style="background: #ea4335;"></span>
                                     <span>Inactivos: <strong id="inactive-count">0</strong></span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Actividad por Día -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-chart-bar"></i> Actividad de Usuarios por Día</h3>
+                    <div style="background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1.5rem;">
+                        <div style="height: 250px; position: relative;">
+                            <canvas id="activityBarChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -717,7 +760,8 @@
             sendPasswordResetEmail,
             GoogleAuthProvider,
             GithubAuthProvider,
-            signInWithPopup
+            signInWithPopup,
+            fetchSignInMethodsForEmail
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { 
             getFirestore,
@@ -772,6 +816,7 @@
                 GoogleAuthProvider,
                 GithubAuthProvider,
                 signInWithPopup,
+                fetchSignInMethodsForEmail,
                 // Firestore functions
                 doc,
                 setDoc,

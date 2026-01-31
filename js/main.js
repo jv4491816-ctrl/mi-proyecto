@@ -33,6 +33,15 @@ function showPage(pageId) {
         initMetronomo();
     } else if (pageId === 'admin-panel-page') {
         initAdminPanel();
+        // Esperar a que se carguen los datos antes de inicializar gráficos
+        setTimeout(() => {
+            if (adminUsers && adminUsers.length > 0) {
+                initializeCharts();
+            } else {
+                // Si no hay datos, cargarlos primero
+                loadAllUsers();
+            }
+        }, 800);
     } else if (pageId === 'foro') {
         // Inicializar mensajes si no están inicializados
         if (!isMessagesInitialized) {
@@ -84,6 +93,662 @@ function showNotification(message, type = 'info') {
         setTimeout(() => notification.remove(), 300);
     }, 3000);
 }
+
+// ========== SISTEMA DE ACTIVIDAD DE USUARIOS ==========
+
+// Estado de actividad de usuarios
+let userActivity = {
+    users: {},
+    timeout: 5 * 60 * 1000, // 5 minutos de inactividad
+    heartbeatInterval: 30 * 1000 // 30 segundos entre heartbeats
+};
+
+// Inicializar seguimiento de actividad
+function initializeActivityTracking() {
+    // Actualizar actividad en cada interacción del usuario
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(event => {
+        document.addEventListener(event, updateUserActivity);
+    });
+    
+    // Enviar heartbeat periódico
+    setInterval(sendHeartbeat, userActivity.heartbeatInterval);
+    
+    // Verificar usuarios inactivos cada minuto
+    setInterval(checkInactiveUsers, 60 * 1000);
+}
+
+// Actualizar actividad del usuario actual
+function updateUserActivity() {
+    if (!currentUser) return;
+    
+    const userId = currentUser.uid || currentUser.email;
+    userActivity.users[userId] = Date.now();
+    
+    // Si el usuario está en el panel de admin, actualizar su estado
+    if (document.getElementById('admin-panel-page')?.classList.contains('active')) {
+        updateUserStatusInTable(userId, true);
+    }
+}
+
+// Enviar heartbeat al servidor (simulado para modo local)
+function sendHeartbeat() {
+    if (!currentUser) return;
+    
+    const userId = currentUser.uid || currentUser.email;
+    const firebase = useFirebase();
+    
+    if (firebase.isAvailable) {
+        firebase.safeOperation(
+            'heartbeat',
+            async () => {
+                // Actualizar lastActivity en Firestore
+                if (currentUser.uid) {
+                    await firebase.modules.updateDoc(
+                        firebase.modules.doc(firebase.db, 'users', currentUser.uid),
+                        { lastActivity: firebase.modules.serverTimestamp() }
+                    );
+                }
+                return true;
+            },
+            () => {
+                // Modo local: actualizar en localStorage
+                userActivity.users[userId] = Date.now();
+                return true;
+            }
+        );
+    } else {
+        // Modo local
+        userActivity.users[userId] = Date.now();
+    }
+}
+
+// Verificar usuarios inactivos
+function checkInactiveUsers() {
+    const now = Date.now();
+    
+    Object.keys(userActivity.users).forEach(userId => {
+        const lastActivity = userActivity.users[userId];
+        const isActive = (now - lastActivity) < userActivity.timeout;
+        
+        // Si el usuario está en el panel de admin, actualizar su estado
+        if (document.getElementById('admin-panel-page')?.classList.contains('active')) {
+            updateUserStatusInTable(userId, isActive);
+        }
+    });
+}
+
+// Actualizar estado de usuario en la tabla
+function updateUserStatusInTable(userId, isActive) {
+    const userRows = document.querySelectorAll('#users-list tr');
+    
+    userRows.forEach(row => {
+        const emailCell = row.querySelector('td:nth-child(2)');
+        if (emailCell && emailCell.textContent.includes(userId.split('@')[0])) {
+            const statusCell = row.querySelector('.status-badge');
+            if (statusCell) {
+                if (isActive) {
+                    statusCell.textContent = 'Activo';
+                    statusCell.className = 'status-badge active';
+                } else {
+                    statusCell.textContent = 'Inactivo';
+                    statusCell.className = 'status-badge inactive';
+                }
+            }
+        }
+    });
+}
+
+// Verificar si un usuario está activo
+function isUserActive(user) {
+    if (!user) return false;
+    
+    const userId = user.uid || user.email;
+    const lastActivity = userActivity.users[userId];
+    
+    if (!lastActivity) return false;
+    
+    return (Date.now() - lastActivity) < userActivity.timeout;
+}
+
+// ========== SISTEMA DE CAMBIO DE NOMBRE ==========
+
+// Elementos del modal de cambio de nombre
+const changeNameModal = document.getElementById('changeNameModal');
+const changeNameBtn = document.getElementById('change-name-btn');
+const changeNameForm = document.getElementById('changeNameForm');
+const newNameInput = document.getElementById('newName');
+const changeNameSubmitBtn = document.getElementById('changeNameSubmitBtn');
+
+// Inicializar funcionalidad de cambio de nombre
+function initializeChangeName() {
+    if (changeNameBtn) {
+        changeNameBtn.addEventListener('click', openChangeNameModal);
+    }
+    
+    if (changeNameForm) {
+        changeNameForm.addEventListener('submit', handleChangeName);
+    }
+}
+
+// Abrir modal de cambio de nombre
+function openChangeNameModal() {
+    if (!currentUser) return;
+    
+    newNameInput.value = currentUser.name || currentUser.firstName || '';
+    changeNameModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Cerrar modal de cambio de nombre
+function closeChangeNameModal() {
+    changeNameModal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    changeNameForm.reset();
+}
+
+// Manejar cambio de nombre
+async function handleChangeName(e) {
+    e.preventDefault();
+    
+    const newName = newNameInput.value.trim();
+    const nameError = document.getElementById('newNameError');
+    
+    if (!newName) {
+        nameError.textContent = 'Por favor ingresa un nombre';
+        return;
+    }
+    
+    if (newName.length < 2) {
+        nameError.textContent = 'El nombre debe tener al menos 2 caracteres';
+        return;
+    }
+    
+    if (!currentUser) {
+        nameError.textContent = 'No hay usuario autenticado';
+        return;
+    }
+    
+    const originalContent = changeNameSubmitBtn.innerHTML;
+    changeNameSubmitBtn.disabled = true;
+    changeNameSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    
+    try {
+        // Actualizar en Firebase si está disponible
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable && currentUser.uid) {
+            // Actualizar en Firestore
+            await firebase.modules.updateDoc(
+                firebase.modules.doc(firebase.db, 'users', currentUser.uid),
+                { displayName: newName }
+            );
+            
+            // Actualizar en Auth si el usuario está autenticado
+            if (firebase.auth.currentUser) {
+                await firebase.modules.updateProfile(firebase.auth.currentUser, {
+                    displayName: newName
+                });
+            }
+        }
+        
+        // Actualizar usuario local
+        currentUser.name = newName;
+        currentUser.firstName = newName.split(' ')[0];
+        currentUser.displayName = newName;
+        
+        // Guardar en localStorage
+        localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
+        
+        // Actualizar UI
+        updateUIForUser(currentUser);
+        
+        // Cerrar modal
+        closeChangeNameModal();
+        
+        // Mostrar notificación de éxito
+        showNotification(`✅ Nombre actualizado a: ${newName}`, 'success');
+        
+        // Si estamos en el panel de admin, actualizar la tabla
+        if (document.getElementById('admin-panel-page')?.classList.contains('active')) {
+            loadAllUsers();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error actualizando nombre:', error);
+        nameError.textContent = 'Error al actualizar el nombre. Intenta de nuevo.';
+    } finally {
+        changeNameSubmitBtn.disabled = false;
+        changeNameSubmitBtn.innerHTML = originalContent;
+    }
+}
+
+// ========== GRÁFICOS CON CHART.JS ==========
+
+// ========== GRÁFICOS CON CHART.JS - VERSIÓN CORREGIDA ==========
+
+// Variables para los gráficos
+let rolePieChart = null;
+let activityPieChart = null;
+let activityBarChart = null;
+
+// Inicializar gráficos CORREGIDO
+function initializeCharts() {
+    console.log("📊 Inicializando gráficos...");
+    console.log("📊 Datos disponibles en adminUsers:", adminUsers ? adminUsers.length : 0);
+    
+    // Solo inicializar si estamos en el panel de admin
+    const adminPage = document.getElementById('admin-panel-page');
+    if (!adminPage || !adminPage.classList.contains('active')) {
+        console.log("❌ No estamos en el panel de admin, no inicializar gráficos");
+        return;
+    }
+    
+    // Verificar si tenemos datos
+    if (!adminUsers || adminUsers.length === 0) {
+        console.warn("⚠️ No hay datos de usuarios. Cargando datos primero...");
+        loadAllUsers(); // Cargar datos primero
+        return;
+    }
+    
+    // Esperar un poco para asegurar que el DOM esté listo
+    setTimeout(() => {
+        try {
+            // Destruir gráficos existentes si hay
+            destroyCharts();
+            
+            // Verificar que los canvas existen
+            const canvases = [
+                'rolePieChart', 
+                'activityPieChart', 
+                'activityBarChart'
+            ];
+            
+            let allCanvasesExist = true;
+            canvases.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (!canvas) {
+                    console.error(`❌ No se encontró el canvas: ${id}`);
+                    allCanvasesExist = false;
+                }
+            });
+            
+            if (!allCanvasesExist) {
+                console.error("❌ Faltan algunos canvas del DOM");
+                return;
+            }
+            
+            // Crear gráficos con datos ACTUALES
+            createRolePieChart();
+            createActivityPieChart();
+            createActivityBarChartReal();
+            
+            console.log("✅ Gráficos inicializados correctamente");
+            
+        } catch (error) {
+            console.error("❌ Error inicializando gráficos:", error);
+            console.error("Detalle del error:", error.stack);
+        }
+    }, 300); // Aumentar delay para asegurar que el DOM esté listo
+}
+
+// Destruir gráficos existentes
+function destroyCharts() {
+    try {
+        if (rolePieChart) {
+            rolePieChart.destroy();
+            rolePieChart = null;
+        }
+        if (activityPieChart) {
+            activityPieChart.destroy();
+            activityPieChart = null;
+        }
+        if (activityBarChart) {
+            activityBarChart.destroy();
+            activityBarChart = null;
+        }
+    } catch (error) {
+        console.warn("⚠️ Error destruyendo gráficos:", error);
+    }
+}
+
+// Crear gráfico de pastel para distribución por rol - VERSIÓN CORREGIDA
+function createRolePieChart() {
+    const ctx = document.getElementById('rolePieChart');
+    if (!ctx) {
+        console.error("❌ No se encontró el canvas para rolePieChart");
+        return;
+    }
+    
+    // Asegurarse de que adminUsers esté definida y tenga datos
+    if (!adminUsers || adminUsers.length === 0) {
+        console.warn("⚠️ No hay datos de usuarios para el gráfico de roles");
+        // Usar datos por defecto para evitar errores
+        adminUsers = adminUsers || [];
+    }
+    
+    // Contar roles de manera segura
+    const studentCount = adminUsers.filter(user => {
+        const role = user.role || '';
+        return role.toLowerCase() === 'estudiante' || role.toLowerCase() === 'student';
+    }).length;
+    
+    const adminCount = adminUsers.filter(user => {
+        const role = user.role || '';
+        return role.toLowerCase() === 'admin' || role.toLowerCase() === 'administrador';
+    }).length;
+    
+    console.log(`📊 Datos para gráfico de roles: Estudiantes=${studentCount}, Admins=${adminCount}`, adminUsers);
+    
+    // Verificar que haya datos para mostrar
+    if (studentCount === 0 && adminCount === 0) {
+        console.warn("⚠️ No hay datos válidos para el gráfico de roles");
+        // Crear gráfico con valores por defecto
+        rolePieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Sin datos'],
+                datasets: [{
+                    data: [1],
+                    backgroundColor: ['rgba(128, 128, 128, 0.8)'],
+                    borderColor: ['rgba(128, 128, 128, 1)'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: 'white',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    // Si hay datos, crear gráfico normal
+    rolePieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Estudiantes', 'Administradores'],
+            datasets: [{
+                data: [studentCount, adminCount],
+                backgroundColor: [
+                    'rgba(26, 115, 232, 0.8)',  // Azul para estudiantes
+                    'rgba(251, 188, 4, 0.8)'    // Amarillo/naranja para admins
+                ],
+                borderColor: [
+                    'rgba(26, 115, 232, 1)',
+                    'rgba(251, 188, 4, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} usuario${value !== 1 ? 's' : ''} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Crear gráfico de pastel para estado de actividad - CORREGIDO
+function createActivityPieChart() {
+    const ctx = document.getElementById('activityPieChart');
+    if (!ctx) {
+        console.error("❌ No se encontró el canvas para activityPieChart");
+        return;
+    }
+    
+    // Usar datos REALES con cálculo correcto de actividad
+    const now = Date.now();
+    const activeCount = adminUsers.filter(user => {
+        // Verificar si el usuario tiene lastActivity o lastLogin
+        const lastActivity = user.lastActivity || user.lastLogin;
+        if (!lastActivity) return false;
+        
+        // Convertir a timestamp si es Date object
+        const lastActivityTime = lastActivity instanceof Date ? 
+            lastActivity.getTime() : 
+            new Date(lastActivity).getTime();
+            
+        // Usuario activo si ha tenido actividad en los últimos 5 minutos
+        return (now - lastActivityTime) < (5 * 60 * 1000);
+    }).length;
+    
+    const inactiveCount = adminUsers.length - activeCount;
+    
+    console.log(`📊 Datos para gráfico de actividad: Activos=${activeCount}, Inactivos=${inactiveCount}`);
+    
+    activityPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Activos', 'Inactivos'],
+            datasets: [{
+                data: [activeCount, inactiveCount],
+                backgroundColor: [
+                    'rgba(52, 168, 83, 0.8)',   // Verde para activos
+                    'rgba(234, 67, 53, 0.8)'    // Rojo para inactivos
+                ],
+                borderColor: [
+                    'rgba(52, 168, 83, 1)',
+                    'rgba(234, 67, 53, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} usuario${value !== 1 ? 's' : ''} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Crear gráfico de barras para actividad por día - CON DATOS REALES
+function createActivityBarChartReal() {
+    const ctx = document.getElementById('activityBarChart');
+    if (!ctx) {
+        console.error("❌ No se encontró el canvas para activityBarChart");
+        return;
+    }
+    
+    // Generar datos REALES basados en las fechas de registro de usuarios
+    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const activities = [0, 0, 0, 0, 0, 0, 0];
+    
+    // Calcular usuarios registrados por día de la semana
+    adminUsers.forEach(user => {
+        if (user.createdAt) {
+            const date = user.createdAt instanceof Date ? 
+                user.createdAt : 
+                new Date(user.createdAt);
+            const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+            
+            // Ajustar índice: nuestro array empieza con Lunes (índice 0)
+            const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            if (adjustedIndex >= 0 && adjustedIndex < 7) {
+                activities[adjustedIndex]++;
+            }
+        }
+    });
+    
+    console.log("📊 Datos para gráfico de barras (registros por día):", activities);
+    
+    activityBarChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Usuarios Registrados',
+                data: activities,
+                backgroundColor: 'rgba(26, 115, 232, 0.8)',
+                borderColor: 'rgba(26, 115, 232, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: 'white',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Registros: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Actualizar gráficos cuando se cargan usuarios - CORREGIDO
+function updateCharts() {
+    console.log("🔄 Actualizando gráficos...");
+    
+    // Solo actualizar si estamos en el panel de admin
+    const adminPage = document.getElementById('admin-panel-page');
+    if (!adminPage || !adminPage.classList.contains('active')) {
+        return;
+    }
+    
+    // Destruir y recrear gráficos con datos actualizados
+    destroyCharts();
+    
+    // Pequeño delay para asegurar que el DOM esté listo
+    setTimeout(() => {
+        try {
+            createRolePieChart();
+            createActivityPieChart();
+            createActivityBarChartReal();
+            console.log("✅ Gráficos actualizados");
+        } catch (error) {
+            console.error("❌ Error actualizando gráficos:", error);
+        }
+    }, 100);
+}
+
+// ========== FUNCIÓN DE DIAGNÓSTICO PARA GRÁFICOS ==========
+function diagnoseCharts() {
+    console.log("🔍 DIAGNÓSTICO DE GRÁFICOS:");
+    console.log("1. adminUsers:", adminUsers ? adminUsers.length : 'undefined');
+    console.log("2. adminUsers contenido:", adminUsers);
+    console.log("3. Canvas rolePieChart:", document.getElementById('rolePieChart'));
+    console.log("4. Canvas activityPieChart:", document.getElementById('activityPieChart'));
+    console.log("5. Canvas activityBarChart:", document.getElementById('activityBarChart'));
+    console.log("6. Página admin activa:", document.getElementById('admin-panel-page')?.classList.contains('active'));
+    
+    // Verificar datos específicos
+    if (adminUsers && adminUsers.length > 0) {
+        const studentCount = adminUsers.filter(u => u.role === 'student').length;
+        const adminCount = adminUsers.filter(u => u.role === 'admin').length;
+        console.log(`📊 Conteo: Estudiantes=${studentCount}, Admins=${adminCount}`);
+    }
+}
+
+// Función para forzar la actualización de gráficos
+function refreshCharts() {
+    console.log("🔄 Forzando actualización de gráficos...");
+    
+    // Destruir gráficos existentes
+    destroyCharts();
+    
+    // Pequeño delay para asegurar que el DOM esté listo
+    setTimeout(() => {
+        try {
+            createRolePieChart();
+            createActivityPieChart();
+            createActivityBarChartReal();
+            console.log("✅ Gráficos actualizados manualmente");
+        } catch (error) {
+            console.error("❌ Error actualizando gráficos:", error);
+        }
+    }, 300);
+}
+
+// Agregar funciones al objeto global window
+window.diagnoseCharts = diagnoseCharts;
+window.refreshCharts = refreshCharts;
 
 // ========== FUNCIONES DE VALIDACIÓN DE CONTRASEÑA ==========
 
@@ -243,7 +908,6 @@ const loginBtn = document.getElementById('login-btn');
 const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const authButtons = document.getElementById('auth-buttons');
-const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
 const userAvatar = document.getElementById('user-avatar');
 const userAvatarContainer = document.getElementById('user-avatar-container');
@@ -525,12 +1189,14 @@ async function saveUserToFirestore(user) {
                         lessons: 0
                     },
                     createdAt: firebase.modules.serverTimestamp(),
-                    lastLogin: firebase.modules.serverTimestamp()
+                    lastLogin: firebase.modules.serverTimestamp(),
+                    lastActivity: firebase.modules.serverTimestamp()
                 });
                 console.log("✅ Usuario creado en Firestore:", user.uid);
             } else {
                 await firebase.modules.updateDoc(userRef, {
-                    lastLogin: firebase.modules.serverTimestamp()
+                    lastLogin: firebase.modules.serverTimestamp(),
+                    lastActivity: firebase.modules.serverTimestamp()
                 });
                 console.log("✅ Usuario actualizado en Firestore:", user.uid);
             }
@@ -586,8 +1252,6 @@ function setupConnectionListeners() {
     });
 }
 
-// ========== SISTEMA DE SINCRONIZACIÓN EN TIEMPO REAL ==========
-
 // Configurar observador de autenticación y sincronización
 function setupAuthObserver() {
     const firebase = useFirebase();
@@ -607,7 +1271,7 @@ function setupAuthObserver() {
                 // Guardar/Actualizar usuario en Firestore
                 await saveUserToFirestore(user);
                 
-                // Manejar usuario y configurar sincronización en tiempo real
+                // Manejar usuario
                 await handleFirebaseUser(user);
                 
                 // Configurar listener en tiempo real para cambios en el documento del usuario
@@ -616,9 +1280,6 @@ function setupAuthObserver() {
                 currentUser = null;
                 localStorage.removeItem('guitarraFacilUser');
                 updateUIForUser(null);
-                
-                // Limpiar listener de sincronización
-                cleanupRealtimeListeners();
             }
         });
         
@@ -656,9 +1317,6 @@ function setupUserRealtimeListener(userId) {
                 
                 // Actualizar la interfaz de usuario
                 updateUIWithRealTimeData(userData);
-                
-                // Mostrar notificación si hay cambios importantes
-                notifyUserChanges(userData);
             }
         }, (error) => {
             console.error("❌ Error en listener de usuario en tiempo real:", error);
@@ -705,6 +1363,11 @@ function updateLocalUserWithFirestoreData(userData) {
     // Actualizar fecha de lastLogin si existe
     if (userData.lastLogin && userData.lastLogin.toDate) {
         updatedUser.lastLogin = userData.lastLogin.toDate().toISOString();
+    }
+    
+    // Actualizar fecha de lastActivity si existe
+    if (userData.lastActivity && userData.lastActivity.toDate) {
+        updatedUser.lastActivity = userData.lastActivity.toDate().toISOString();
     }
     
     localStorage.setItem('guitarraFacilUser', JSON.stringify(updatedUser));
@@ -773,26 +1436,6 @@ function updateUIWithRealTimeData(userData) {
     uiUpdater.updateAdminVisibility(isAdmin);
 }
 
-// Notificar al usuario sobre cambios importantes
-function notifyUserChanges(userData) {
-    const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser')) || {};
-    
-    // Notificar cambio de rol
-    if (savedUser.role !== userData.role) {
-        const roleMessage = userData.role === 'admin' ? 
-            '¡Ahora eres administrador!' : 'Tu rol ha cambiado a estudiante';
-        showNotification(`🔄 ${roleMessage}`, 'info');
-    }
-    
-    // Notificar progreso significativo
-    if (userData.progress && savedUser.progress) {
-        const progressDiff = (userData.progress.percentage || 0) - (savedUser.progress.percentage || 0);
-        if (progressDiff >= 10) {
-            showNotification(`🎉 ¡Progreso actualizado! Ahora estás al ${userData.progress.percentage}%`, 'success');
-        }
-    }
-}
-
 // Manejar usuario de Firebase
 async function handleFirebaseUser(user) {
     console.log("👤 Procesando usuario de Firebase:", user.email);
@@ -804,6 +1447,7 @@ async function handleFirebaseUser(user) {
         email: user.email,
         name: user.displayName || user.email.split('@')[0],
         firstName: user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0],
+        displayName: user.displayName || user.email.split('@')[0],
         role: isAdmin ? 'admin' : 'student',
         isFirebaseUser: true,
         emailVerified: user.emailVerified,
@@ -815,10 +1459,14 @@ async function handleFirebaseUser(user) {
         const nameFromEmail = user.email.split('@')[0];
         currentUser.name = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1);
         currentUser.firstName = currentUser.name.split(' ')[0];
+        currentUser.displayName = currentUser.name;
     }
     
     localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
     updateUIForUser(currentUser);
+    
+    // Registrar actividad inicial
+    updateUserActivity();
     
     // Notificar si es admin
     if (isAdmin) {
@@ -843,6 +1491,9 @@ function loadUserFromStorage() {
         
         updateUIForUser(currentUser);
         console.log("📂 Usuario cargado desde localStorage:", currentUser.email);
+        
+        // Registrar actividad inicial
+        updateUserActivity();
     }
 }
 
@@ -859,6 +1510,7 @@ const uiUpdater = {
         this.showUserInfo(user);
         this.updateAvatar(user);
         this.updateWelcomeMessages(user);
+        this.updateChangeNameButton(user);
     },
     
     updateAvatar(user) {
@@ -888,8 +1540,17 @@ const uiUpdater = {
         });
     },
     
+    updateChangeNameButton(user) {
+        const changeNameBtn = document.getElementById('change-name-btn');
+        if (changeNameBtn) {
+            changeNameBtn.style.display = 'flex';
+        }
+    },
+    
     showAuthButtons() {
         if (authButtons) authButtons.style.display = 'flex';
+        const changeNameBtn = document.getElementById('change-name-btn');
+        if (changeNameBtn) changeNameBtn.style.display = 'none';
     },
     
     hideAuthButtons() {
@@ -897,11 +1558,13 @@ const uiUpdater = {
     },
     
     showUserInfo(user) {
+        const userInfo = document.getElementById('user-info');
         if (userInfo) userInfo.style.display = 'flex';
         if (userName) userName.textContent = user.firstName || user.name.split(' ')[0];
     },
     
     hideUserInfo() {
+        const userInfo = document.getElementById('user-info');
         if (userInfo) userInfo.style.display = 'none';
     },
     
@@ -990,10 +1653,15 @@ function handleLocalLogin(email, password) {
             if (user) {
                 currentUser = {
                     ...user,
-                    firstName: user.name.split(' ')[0]
+                    firstName: user.name.split(' ')[0],
+                    displayName: user.name
                 };
                 localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
                 updateUIForUser(currentUser);
+                
+                // Registrar actividad inicial
+                updateUserActivity();
+                
                 resolve(currentUser);
             } else {
                 reject(new Error('Email o contraseña incorrectos'));
@@ -1017,6 +1685,7 @@ function handleLocalSignup(name, email, password) {
             currentUser = {
                 name: name,
                 firstName: name.split(' ')[0],
+                displayName: name,
                 email: email,
                 role: isAdmin ? 'admin' : 'student',
                 progress: { level: 1, percentage: 0, lessons: 0 },
@@ -1026,6 +1695,9 @@ function handleLocalSignup(name, email, password) {
             
             localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
             updateUIForUser(currentUser);
+            
+            // Registrar actividad inicial
+            updateUserActivity();
             
             resolve(currentUser);
         }, 1000);
@@ -1785,6 +2457,15 @@ if (loginModal) {
     });
 }
 
+// Cerrar modal de cambio de nombre al hacer clic fuera
+if (changeNameModal) {
+    changeNameModal.addEventListener('click', function(e) {
+        if (e.target === changeNameModal) {
+            closeChangeNameModal();
+        }
+    });
+}
+
 // ========== SISTEMA DE MENSAJES DEL ADMIN CON FIRESTORE ==========
 
 // Estado de los mensajes
@@ -2439,6 +3120,8 @@ async function loadAllUsers() {
         adminUsers = cachedUsers;
         updateUsersTable();
         updateAdminStats();
+        // LLAMAR A updateCharts() DESPUÉS de actualizar adminUsers
+        updateCharts();
         console.log("📦 Usuarios cargados desde caché");
         return;
     }
@@ -2460,13 +3143,15 @@ async function loadAllUsers() {
                     id: doc.id,
                     ...userData,
                     createdAt: userData.createdAt?.toDate() || new Date(),
-                    lastLogin: userData.lastLogin?.toDate() || null
+                    lastLogin: userData.lastLogin?.toDate() || null,
+                    lastActivity: userData.lastActivity?.toDate() || null
                 });
             });
             
             console.log(`✅ ${adminUsers.length} usuarios cargados desde Firestore`);
             
         } else {
+            // Datos demo para desarrollo
             adminUsers = [
                 {
                     id: '1',
@@ -2475,6 +3160,7 @@ async function loadAllUsers() {
                     role: 'admin',
                     createdAt: new Date('2024-01-01'),
                     lastLogin: new Date(),
+                    lastActivity: new Date(),
                     photoURL: '',
                     progress: { level: 5, percentage: 80, lessons: 25 }
                 },
@@ -2485,6 +3171,7 @@ async function loadAllUsers() {
                     role: 'admin',
                     createdAt: new Date('2024-01-02'),
                     lastLogin: new Date(),
+                    lastActivity: new Date(Date.now() - 10 * 60 * 1000), // 10 minutos atrás
                     progress: { level: 4, percentage: 70, lessons: 20 }
                 },
                 {
@@ -2494,6 +3181,7 @@ async function loadAllUsers() {
                     role: 'student',
                     createdAt: new Date('2024-01-03'),
                     lastLogin: new Date(),
+                    lastActivity: new Date(),
                     progress: { level: 2, percentage: 40, lessons: 10 }
                 },
                 {
@@ -2503,6 +3191,7 @@ async function loadAllUsers() {
                     role: 'student',
                     createdAt: new Date('2024-01-04'),
                     lastLogin: null,
+                    lastActivity: null,
                     progress: { level: 1, percentage: 10, lessons: 2 }
                 }
             ];
@@ -2513,6 +3202,8 @@ async function loadAllUsers() {
         userCache.set('allUsers', adminUsers);
         updateUsersTable();
         updateAdminStats();
+        // LLAMAR A updateCharts() DESPUÉS de tener los datos
+        updateCharts();
         
     } catch (error) {
         console.error('❌ Error cargando usuarios:', error);
@@ -2532,7 +3223,10 @@ function updateUsersTable() {
     const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
     
     adminUsers.forEach(user => {
-        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        // Determinar si el usuario está activo (basado en lastActivity o lastLogin)
+        const lastActivity = user.lastActivity || user.lastLogin;
+        const isActive = lastActivity && (new Date() - lastActivity) < (5 * 60 * 1000); // 5 minutos
+        
         const isCurrentUser = user.email === userData?.email;
         const isAdmin = user.role === 'admin';
         
@@ -2540,8 +3234,8 @@ function updateUsersTable() {
         const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         
         const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
-        const lastAccess = user.lastLogin ? 
-            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+        const lastAccess = lastActivity ? 
+            lastActivity.toLocaleDateString() + ' ' + lastActivity.toLocaleTimeString().substring(0, 5) : 
             'Nunca';
         
         const row = document.createElement('tr');
@@ -2566,7 +3260,7 @@ function updateUsersTable() {
             <td>${user.email}</td>
             <td>${registerDate}</td>
             <td>${lastAccess}</td>
-            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
+            <td><span class="role-badge-cell ${isAdmin ? 'admin' : 'estudiante'}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
             <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
             <td>
                 <div class="user-actions">
@@ -2595,9 +3289,10 @@ function updateUsersTable() {
 // Actualizar estadísticas del admin
 function updateAdminStats() {
     const totalUsers = adminUsers.length;
-    const activeUsers = adminUsers.filter(user => 
-        user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000)
-    ).length;
+    const activeUsers = adminUsers.filter(user => {
+        const lastActivity = user.lastActivity || user.lastLogin;
+        return lastActivity && (new Date() - lastActivity) < (5 * 60 * 1000);
+    }).length;
     
     const newToday = adminUsers.filter(user => 
         user.createdAt.toDateString() === new Date().toDateString()
@@ -2649,7 +3344,8 @@ function filterUsers() {
     const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
     
     filteredUsers.forEach(user => {
-        const isActive = user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000);
+        const lastActivity = user.lastActivity || user.lastLogin;
+        const isActive = lastActivity && (new Date() - lastActivity) < (5 * 60 * 1000);
         const isCurrentUser = user.email === userData?.email;
         const isAdmin = user.role === 'admin';
         
@@ -2657,8 +3353,8 @@ function filterUsers() {
         const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         
         const registerDate = user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A';
-        const lastAccess = user.lastLogin ? 
-            user.lastLogin.toLocaleDateString() + ' ' + user.lastLogin.toLocaleTimeString().substring(0, 5) : 
+        const lastAccess = lastActivity ? 
+            lastActivity.toLocaleDateString() + ' ' + lastActivity.toLocaleTimeString().substring(0, 5) : 
             'Nunca';
         
         const row = document.createElement('tr');
@@ -2742,6 +3438,7 @@ async function toggleUserRole(userId, userEmail) {
         
         updateUsersTable();
         updateAdminStats();
+        updateCharts();
         
         showNotification(`✅ Rol actualizado: ${userEmail} ahora es ${newRole === 'admin' ? 'administrador' : 'estudiante'}`, 'success');
         
@@ -2794,20 +3491,13 @@ async function deleteUser(userId, userEmail) {
         
         updateUsersTable();
         updateAdminStats();
+        updateCharts();
         
         showNotification('✅ Usuario eliminado correctamente', 'success');
         
     } catch (error) {
         console.error('❌ Error eliminando usuario:', error);
         showNotification('Error al eliminar el usuario', 'error');
-    }
-}
-
-// Enviar anuncio a todos los usuarios
-function sendAnnouncement() {
-    const message = prompt('Escribe el anuncio que quieres enviar a todos los usuarios:');
-    if (message && message.trim()) {
-        showNotification(`📢 Anuncio enviado a ${adminUsers.length} usuarios`, 'success');
     }
 }
 
@@ -2821,7 +3511,7 @@ function exportUsers() {
             user.role === 'admin' ? 'Administrador' : 'Estudiante',
             user.createdAt.toLocaleDateString(),
             user.lastLogin ? user.lastLogin.toLocaleDateString() : 'Nunca',
-            user.lastLogin && (new Date() - user.lastLogin) < (7 * 24 * 60 * 60 * 1000) ? 'Activo' : 'Inactivo'
+            (user.lastActivity || user.lastLogin) && (new Date() - (user.lastActivity || user.lastLogin)) < (5 * 60 * 1000) ? 'Activo' : 'Inactivo'
         ])
     ].map(row => row.join(',')).join('\n');
     
@@ -2844,7 +3534,10 @@ function generateReport() {
     const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
     
     const newThisMonth = adminUsers.filter(user => user.createdAt >= monthAgo).length;
-    const activeThisMonth = adminUsers.filter(user => user.lastLogin && user.lastLogin >= monthAgo).length;
+    const activeThisMonth = adminUsers.filter(user => {
+        const lastActivity = user.lastActivity || user.lastLogin;
+        return lastActivity && lastActivity >= monthAgo;
+    }).length;
     
     showNotification(`📊 Reporte Mensual:\n\n• Nuevos usuarios este mes: ${newThisMonth}\n• Usuarios activos este mes: ${activeThisMonth}\n• Total usuarios: ${adminUsers.length}\n• Administradores: ${adminUsers.filter(u => u.role === 'admin').length}\n• Estudiantes: ${adminUsers.filter(u => u.role === 'student').length}`, 'info');
 }
@@ -2869,6 +3562,36 @@ function backupDatabase() {
     
     showNotification('✅ Respaldo de base de datos generado y descargado', 'success');
 }
+
+// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN ==========
+window.manageUsers = function() {
+    showPage('admin-panel-page');
+};
+
+window.manageContent = function() {
+    showNotification('📚 Redirigiendo a gestión de contenido...', 'info');
+};
+
+window.viewStatistics = function() {
+    showNotification('📊 Redirigiendo a estadísticas...', 'info');
+};
+
+// Función global para recargar usuarios
+window.refreshUsersList = function() {
+    console.log("🔄 Recargando lista de usuarios...");
+    userCache.clear(); // Limpiar caché
+    loadAllUsers();
+    showNotification('Lista de usuarios actualizada', 'success');
+};
+
+window.exportUsers = exportUsers;
+window.generateReport = generateReport;
+window.backupDatabase = backupDatabase;
+window.refreshMessages = refreshMessages;
+window.closeChangeNameModal = closeChangeNameModal;
+
+// También puedes mantener la función original como global si necesitas compatibilidad
+window.loadAllUsers = loadAllUsers;
 
 // ========== AFINADOR MEJORADO ==========
 
@@ -3671,32 +4394,18 @@ function handleMetronomoKeyboardShortcuts(e) {
     }
 }
 
-// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN ==========
-window.manageUsers = function() {
-    showPage('admin-panel-page');
-};
-
-window.manageContent = function() {
-    showNotification('📚 Redirigiendo a gestión de contenido...', 'info');
-};
-
-window.viewStatistics = function() {
-    showNotification('📊 Redirigiendo a estadísticas...', 'info');
-};
-
-window.loadAllUsers = loadAllUsers;
-window.sendAnnouncement = sendAnnouncement;
-window.exportUsers = exportUsers;
-window.generateReport = generateReport;
-window.backupDatabase = backupDatabase;
-window.refreshMessages = refreshMessages;
-
 // ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM cargado, inicializando aplicación...');
     
     // Inicializar Firebase
     initializeFirebase();
+    
+    // Inicializar sistema de actividad
+    initializeActivityTracking();
+    
+    // Inicializar funcionalidad de cambio de nombre
+    initializeChangeName();
     
     // Monitorear cambios en el estado del usuario para mensajes
     let lastUserState = null;
