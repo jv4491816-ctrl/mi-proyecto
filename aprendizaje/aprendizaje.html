@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aprende Música - Sistema Completo</title>
+    
+    <!-- SOLO ESTE CSS - el específico para aprendizaje -->
+    <link rel="stylesheet" href="css/aprendizaje.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Modal de Login/Registro -->
+    <div id="loginModal" class="modal">
+        <div class="modal-container">
+            <div class="modal-welcome-section">
+                <button class="modal-close-btn" id="modalCloseBtn">&times;</button>
+                <div class="modal-guitar-icon">
+                    <i class="fas fa-guitar"></i>
+                </div>
+                <h1>¡Hola!...Músico</h1>
+                <h2>Aprende Guitarra, <span class="highlight">Domina la Música</span></h2>
+                <p>Domina la guitarra y descubre el músico que llevas dentro. Aprende a tu ritmo con nuestros cursos especializados, desde principiante hasta avanzado.</p>
+                <div class="modal-nav-buttons">
+                    <button class="modal-nav-btn modal-signup-btn" id="modalSignupBtn">REGISTRARSE</button>
+                    <button class="modal-nav-btn modal-login-btn-nav" id="modalLoginBtn">INICIAR SESIÓN</button>
+                </div>
+            </div>
+            
+            <div class="modal-form-section" id="modalFormSection">
+                <!-- El contenido del formulario se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón Cerrar Sesión (separado, oculto inicialmente) -->
+    <button id="logoutBtnLearning" style="display: none;">
+        <i class="fas fa-sign-out-alt"></i>
+        Cerrar Sesión
+    </button>
+
+    <!-- Botón Volver al Index -->
+    <button class="back-to-index-btn" id="backToIndex">
+        <i class="fas fa-home"></i>
+        Volver al Index
+    </button>
+
+    <!-- Información del Usuario (oculta inicialmente) -->
+    <div id="userInfo" style="display: none;">
+        <div class="user-info-content">
+            <div class="user-avatar-circle" id="userAvatarCircle">
+                <span id="userInitial">U</span>
+            </div>
+            <div class="user-details">
+                <div class="user-name" id="userName">Usuario</div>
+                <div class="user-points">
+                    Puntos: <span class="points-value" id="userPoints">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón Login (visible si no hay usuario) -->
+    <button id="loginBtnLearning">
+        <i class="fas fa-sign-in-alt"></i>
+        Iniciar Sesión
+    </button>
+
+    <!-- Botón Volver al Menú (oculto inicialmente) -->
+    <button class="back-btn" id="backToMenu" style="display: none;">
+        <i class="fas fa-arrow-left"></i>
+        Volver al Menú
+    </button>
+    
+    <!-- Notificación de Logro al estilo Steam -->
+    <div class="achievement-notification" id="achievementNotification">
+        <button class="achievement-close" id="achievementClose">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="achievement-header">
+            <div class="achievement-icon">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <div class="achievement-title">¡LOGRO DESBLOQUEADO!</div>
+        </div>
+        <div class="achievement-body">
+            <div class="achievement-name" id="achievementName">Dominador de Acordes Mayores</div>
+            <div class="achievement-desc" id="achievementDesc">Has completado todos los acordes mayores básicos</div>
+            <div class="achievement-progress" id="achievementProgress">+100 XP</div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-music"></i>
+                <h1 id="appTitle">Aprende Música - Sistema Completo</h1>
+            </div>
+            <p style="color: #bdc3c7; margin-top: 0.5rem; max-width: 600px; margin: 0.5rem auto;" id="appDescription">
+                Sistema completo de aprendizaje musical en 3 etapas
+            </p>
+        </header>
+        
+        <!-- Indicador de progreso -->
+        <div class="progress-container" id="progressContainer">
+            <span id="currentLevelText">Nivel 1: Acordes Mayores</span>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span id="progressText">0% Completado</span>
+        </div>
+        
+        <!-- MENÚ PRINCIPAL -->
+        <div id="mainMenu" class="main-menu">
+            <h2>Ruta de Aprendizaje Musical</h2>
+            <p class="menu-description">
+                Sigue estos 3 pasos para desarrollar tus habilidades musicales completas.
+                Cada etapa te prepara para la siguiente.
+            </p>
+            
+            <div class="menu-grid">
+                <!-- Etapa 1: Acordes -->
+                <div class="menu-card completed" id="menuChords">
+                    <div class="menu-icon chords">
+                        <i class="fas fa-guitar"></i>
+                    </div>
+                    <h3>1. Aprende Acordes Básicos</h3>
+                    <p>Domina los acordes mayores y menores esenciales para tocar cualquier canción.</p>
+                    <div class="status-badge completed" id="chordsStatus">COMPLETADO</div>
+                </div>
+                
+                <!-- Etapa 2: Escalas -->
+                <div class="menu-card" id="menuScales">
+                    <div class="menu-icon scales">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <h3>2. Aprende Escalas Básicas</h3>
+                    <p>Descubre las escalas fundamentales para improvisar y crear melodías.</p>
+                    <div class="status-badge unlocked" id="scalesStatus">DESBLOQUEADO</div>
+                </div>
+                
+                <!-- Etapa 3: Entrenar oído -->
+                <div class="menu-card" id="menuEar">
+                    <div class="menu-icon ear">
+                        <i class="fas fa-ear"></i>
+                    </div>
+                    <h3>3. Entrena tu Oído Musical</h3>
+                    <p>Desarrolla tu habilidad para reconocer notas, intervalos y acordes al oído.</p>
+                    <div class="status-badge locked" id="earStatus">BLOQUEADO</div>
+                </div>
+            </div>
+            
+            <p style="color: #bdc3c7; margin-top: 2rem; max-width: 600px;">
+                <i class="fas fa-info-circle" style="color: #3498db;"></i>
+                Completa cada etapa en orden para desbloquear la siguiente.
+            </p>
+        </div>
+        
+        <!-- SELECCIÓN DE TIPO DE ACORDE -->
+        <div id="chordTypeSelection" class="selection-section">
+            <h2>Selecciona el Tipo de Acorde</h2>
+            <p class="menu-description">
+                Elige entre acordes mayores (sonido alegre) o menores (sonido melancólico).
+                Puedes practicar ambos tipos cuando quieras.
+            </p>
+            
+            <div class="selection-grid">
+                <!-- Acordes Mayores -->
+                <div class="selection-card major" id="selectMajorChords">
+                    <div class="selection-icon major">
+                        <i class="fas fa-sun"></i>
+                    </div>
+                    <h3>Acordes Mayores</h3>
+                    <p>Aprende los 7 acordes mayores básicos: DO, RE, MI, FA, SOL, LA, SI</p>
+                    <div class="status-badge completed" id="majorSelectionStatus">COMPLETADO</div>
+                    <p style="color: #3498db; margin-top: 1rem;">
+                        <i class="fas fa-check-circle"></i>
+                        7 acordes disponibles
+                    </p>
+                </div>
+                
+                <!-- Acordes Menores -->
+                <div class="selection-card minor" id="selectMinorChords">
+                    <div class="selection-icon minor">
+                        <i class="fas fa-moon"></i>
+                    </div>
+                    <h3>Acordes Menores</h3>
+                    <p>Aprende los 7 acordes menores básicos: do, re, mi, fa, sol, la, si</p>
+                    <div class="status-badge completed" id="minorSelectionStatus">COMPLETADO</div>
+                    <p style="color: #9b59b6; margin-top: 1rem;">
+                        <i class="fas fa-check-circle"></i>
+                        7 acordes disponibles
+                    </p>
+                </div>
+            </div>
+            
+            <button class="back-to-menu-btn" id="backToMenuFromSelection">
+                <i class="fas fa-home"></i>
+                Volver al Menú Principal
+            </button>
+        </div>
+        
+        <!-- SELECCIÓN DE TIPO DE ESCALA -->
+        <div id="scaleTypeSelection" class="selection-section">
+            <h2>Selecciona el Tipo de Escala</h2>
+            <p class="menu-description">
+                Elige entre escalas mayores (sonido alegre y brillante) o escalas menores (sonido melancólico y emotivo).
+            </p>
+            
+            <div class="selection-grid">
+                <!-- Escalas Mayores -->
+                <div class="selection-card major" id="selectMajorScales">
+                    <div class="selection-icon major">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Escalas Mayores</h3>
+                    <p>Aprende las 7 escalas mayores básicas: DO, RE, MI, FA, SOL, LA, SI</p>
+                    <div class="status-badge in-progress" id="majorScaleSelectionStatus">DISPONIBLE</div>
+                    <p style="color: #3498db; margin-top: 1rem;">
+                        <i class="fas fa-music"></i>
+                        7 escalas disponibles
+                    </p>
+                </div>
+                
+                <!-- Escalas Menores -->
+                <div class="selection-card minor" id="selectMinorScales">
+                    <div class="selection-icon minor">
+                        <i class="fas fa-wave-square"></i>
+                    </div>
+                    <h3>Escalas Menores</h3>
+                    <p>Aprende las 7 escalas menores básicas: do, re, mi, fa, sol, la, si</p>
+                    <div class="status-badge in-progress" id="minorScaleSelectionStatus">DISPONIBLE</div>
+                    <p style="color: #9b59b6; margin-top: 1rem;">
+                        <i class="fas fa-music"></i>
+                        7 escalas disponibles
+                    </p>
+                </div>
+            </div>
+            
+            <button class="back-to-menu-btn" id="backToMenuFromScaleSelection">
+                <i class="fas fa-home"></i>
+                Volver al Menú Principal
+            </button>
+        </div>
+        
+        <!-- CONTENIDO DE APRENDIZAJE (inicialmente oculto) -->
+        <div id="learningContent" class="main-content" style="display: none;">
+            <!-- Nivel 1: Acordes Mayores -->
+            <div id="majorLevel" class="level-content">
+                <div class="level-header">
+                    <div class="level-info">
+                        <h2 class="major">Acordes Mayores</h2>
+                        <div class="item-counter" id="majorCounter">Acorde 1 de 7</div>
+                    </div>
+                    <div class="level-status unlocked" id="majorStatus">EN PROGRESO</div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="content-display">
+                        <div class="image-section">
+                            <div class="content-image-container" id="majorImageContainer">
+                                <!-- Imagen se cargará aquí -->
+                            </div>
+                            <div class="sound-controls">
+                                <button class="sound-btn" id="majorPlayChord">
+                                    <i class="fas fa-play"></i>
+                                    <span>Tocar Acorde</span>
+                                </button>
+                                <button class="sound-btn" id="majorPlayArpeggio">
+                                    <i class="fas fa-music"></i>
+                                    <span>Tocar Arpegio</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Selector de acordes para repaso -->
+                            <div class="content-selector" id="majorChordSelector">
+                                <!-- Se llenará con JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="info-section">
+                            <div class="content-name major" id="majorChordName">DO Mayor</div>
+                            <span class="content-type major">Mayor</span>
+                            
+                            <div class="content-info">
+                                <h3>Digitación:</h3>
+                                <ul class="info-list" id="majorFingering">
+                                    <!-- Se llenará con JS -->
+                                </ul>
+                            </div>
+                            
+                            <div class="tips-box">
+                                <h4>Consejo:</h4>
+                                <p id="majorTips">Consejo del acorde actual</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="navigation">
+                        <button class="nav-btn" id="majorPrev" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            <span>Atrás</span>
+                        </button>
+                        <button class="nav-btn" id="majorNext" disabled>
+                            <span>Siguiente</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Botón para volver a selección -->
+                <button class="back-to-selection-btn" id="backToChordSelectFromMajor">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Selección de Acordes
+                </button>
+                
+                <!-- Botón para modo repaso -->
+                <button class="review-mode-btn" id="majorReviewModeBtn">
+                    <i class="fas fa-redo"></i>
+                    Activar Modo Repaso
+                </button>
+            </div>
+            
+            <!-- Nivel 2: Acordes Menores -->
+            <div id="minorLevel" class="level-content" style="display: none;">
+                <div class="level-header">
+                    <div class="level-info">
+                        <h2 class="minor">Acordes Menores</h2>
+                        <div class="item-counter" id="minorCounter">Acorde 1 de 7</div>
+                    </div>
+                    <div class="level-status unlocked" id="minorStatus">EN PROGRESO</div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="content-display">
+                        <div class="image-section">
+                            <div class="content-image-container" id="minorImageContainer">
+                                <!-- Imagen se cargará aquí -->
+                            </div>
+                            <div class="sound-controls">
+                                <button class="sound-btn minor" id="minorPlayChord">
+                                    <i class="fas fa-play"></i>
+                                    <span>Tocar Acorde</span>
+                                </button>
+                                <button class="sound-btn minor" id="minorPlayArpeggio">
+                                    <i class="fas fa-music"></i>
+                                    <span>Tocar Arpegio</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Selector de acordes para repaso -->
+                            <div class="content-selector" id="minorChordSelector">
+                                <!-- Se llenará con JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="info-section minor">
+                            <div class="content-name minor" id="minorChordName">do menor</div>
+                            <span class="content-type minor">Menor</span>
+                            
+                            <div class="content-info minor">
+                                <h3>Digitación:</h3>
+                                <ul class="info-list" id="minorFingering">
+                                    <!-- Se llenará con JS -->
+                                </ul>
+                            </div>
+                            
+                            <div class="tips-box">
+                                <h4>Consejo:</h4>
+                                <p id="minorTips">Consejo del acorde actual</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="navigation">
+                        <button class="nav-btn" id="minorPrev" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            <span>Atrás</span>
+                        </button>
+                        <button class="nav-btn" id="minorNext" disabled>
+                            <span>Siguiente</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Botón para volver a selección -->
+                <button class="back-to-selection-btn" id="backToChordSelectFromMinor">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Selección de Acordes
+                </button>
+                
+                <!-- Botón para modo repaso -->
+                <button class="review-mode-btn" id="minorReviewModeBtn">
+                    <i class="fas fa-redo"></i>
+                    Activar Modo Repaso
+                </button>
+            </div>
+            
+            <!-- Nivel 3: Escalas Mayores -->
+            <div id="majorScaleLevel" class="level-content" style="display: none;">
+                <div class="level-header">
+                    <div class="level-info">
+                        <h2 class="major">Escalas Mayores</h2>
+                        <div class="item-counter" id="majorScaleCounter">Escala 1 de 7</div>
+                    </div>
+                    <div class="level-status unlocked" id="majorScaleStatus">EN PROGRESO</div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="content-display">
+                        <div class="image-section">
+                            <div class="content-image-container" id="majorScaleImageContainer">
+                                <!-- Imagen se cargará aquí -->
+                            </div>
+                            <div class="sound-controls">
+                                <button class="sound-btn" id="majorScalePlayScale">
+                                    <i class="fas fa-music"></i>
+                                    <span>Tocar Escala Ascendente</span>
+                                </button>
+                                <button class="sound-btn" id="majorScalePlayPattern">
+                                    <i class="fas fa-project-diagram"></i>
+                                    <span>Patrón de Terceras</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Selector de escalas para repaso -->
+                            <div class="content-selector" id="majorScaleSelector">
+                                <!-- Se llenará con JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="info-section">
+                            <div class="content-name major" id="majorScaleName">Escala de DO Mayor</div>
+                            <span class="content-type major">Escala Mayor</span>
+                            
+                            <div class="content-info">
+                                <h3>Patrón de la Escala:</h3>
+                                <div class="scale-pattern" id="majorScalePattern">
+                                    <!-- Patrón de escala se cargará aquí -->
+                                </div>
+                            </div>
+                            
+                            <div class="content-info">
+                                <h3>Digitación:</h3>
+                                <ul class="info-list" id="majorScaleFingering">
+                                    <!-- Se llenará con JS -->
+                                </ul>
+                            </div>
+                            
+                            <div class="tips-box">
+                                <h4>Consejo:</h4>
+                                <p id="majorScaleTips">Consejo de la escala actual</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="navigation">
+                        <button class="nav-btn" id="majorScalePrev" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            <span>Atrás</span>
+                        </button>
+                        <button class="nav-btn" id="majorScaleNext" disabled>
+                            <span>Siguiente</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Botón para volver a selección -->
+                <button class="back-to-selection-btn" id="backToScaleSelectFromMajor">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Selección de Escalas
+                </button>
+                
+                <!-- Botón para modo repaso -->
+                <button class="review-mode-btn" id="majorScaleReviewModeBtn">
+                    <i class="fas fa-redo"></i>
+                    Activar Modo Repaso
+                </button>
+            </div>
+            
+            <!-- Nivel 4: Escalas Menores -->
+            <div id="minorScaleLevel" class="level-content" style="display: none;">
+                <div class="level-header">
+                    <div class="level-info">
+                        <h2 class="minor">Escalas Menores</h2>
+                        <div class="item-counter" id="minorScaleCounter">Escala 1 de 7</div>
+                    </div>
+                    <div class="level-status unlocked" id="minorScaleStatus">EN PROGRESO</div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="content-display">
+                        <div class="image-section">
+                            <div class="content-image-container" id="minorScaleImageContainer">
+                                <!-- Imagen se cargará aquí -->
+                            </div>
+                            <div class="sound-controls">
+                                <button class="sound-btn minor" id="minorScalePlayScale">
+                                    <i class="fas fa-music"></i>
+                                    <span>Tocar Escala Ascendente</span>
+                                </button>
+                                <button class="sound-btn minor" id="minorScalePlayPattern">
+                                    <i class="fas fa-project-diagram"></i>
+                                    <span>Patrón de Terceras</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Selector de escalas para repaso -->
+                            <div class="content-selector" id="minorScaleSelector">
+                                <!-- Se llenará con JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="info-section minor">
+                            <div class="content-name minor" id="minorScaleName">Escala de do menor</div>
+                            <span class="content-type minor">Escala Menor</span>
+                            
+                            <div class="content-info minor">
+                                <h3>Patrón de la Escala:</h3>
+                                <div class="scale-pattern" id="minorScalePattern">
+                                    <!-- Patrón de escala se cargará aquí -->
+                                </div>
+                            </div>
+                            
+                            <div class="content-info minor">
+                                <h3>Digitación:</h3>
+                                <ul class="info-list" id="minorScaleFingering">
+                                    <!-- Se llenará con JS -->
+                                </ul>
+                            </div>
+                            
+                            <div class="tips-box">
+                                <h4>Consejo:</h4>
+                                <p id="minorScaleTips">Consejo de la escala actual</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="navigation">
+                        <button class="nav-btn" id="minorScalePrev" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                            <span>Atrás</span>
+                        </button>
+                        <button class="nav-btn" id="minorScaleNext" disabled>
+                            <span>Siguiente</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Botón para volver a selección -->
+                <button class="back-to-selection-btn" id="backToScaleSelectFromMinor">
+                    <i class="fas fa-arrow-left"></i>
+                    Volver a Selección de Escalas
+                </button>
+                
+                <!-- Botón para modo repaso -->
+                <button class="review-mode-btn" id="minorScaleReviewModeBtn">
+                    <i class="fas fa-redo"></i>
+                    Activar Modo Repaso
+                </button>
+            </div>
+            
+            <!-- Nivel 5: Entrenamiento Auditivo -->
+            <div id="earTrainingLevel" class="level-content" style="display: none;">
+                <div class="level-header">
+                    <div class="level-info">
+                        <h2 style="color: #2ecc71;">Entrenamiento Auditivo</h2>
+                        <div class="item-counter" id="earCounter">Identifica las notas musicales</div>
+                    </div>
+                    <div class="level-status unlocked" id="earStatusDisplay">EN PROGRESO</div>
+                </div>
+                
+                <div class="content-card ear-training-level">
+                    <!-- Misión de 100 puntos -->
+                    <div class="mission-container" id="missionContainer">
+                        <div class="mission-title">
+                            <i class="fas fa-bullseye"></i> Misión: Oído Absoluto
+                        </div>
+                        <div class="mission-progress">
+                            <div class="mission-progress-fill" id="missionProgressFill"></div>
+                        </div>
+                        <div class="mission-text" id="missionText">
+                            Alcanza <span id="missionScore">100</span> puntos para completar esta etapa
+                        </div>
+                    </div>
+                    
+                    <div class="challenge-container">
+                        <div class="note-display" id="currentNote">
+                            ¿Qué nota escuchaste?
+                        </div>
+                        
+                        <div class="staff-container">
+                            <div class="staff">
+                                <div class="staff-lines">
+                                    <div class="staff-line"></div>
+                                    <div class="staff-line"></div>
+                                    <div class="staff-line"></div>
+                                    <div class="staff-line"></div>
+                                    <div class="staff-line"></div>
+                                </div>
+                                
+                                <div class="clef-container">
+                                    <div class="clef">𝄞</div>
+                                </div>
+                                
+                                <!-- Nota en el pentagrama -->
+                                <div class="note-on-staff" id="staffNote"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="note-options">
+                            <div class="note-option" data-note="C4">Do (C4)</div>
+                            <div class="note-option" data-note="D4">Re (D4)</div>
+                            <div class="note-option" data-note="E4">Mi (E4)</div>
+                            <div class="note-option" data-note="F4">Fa (F4)</div>
+                            <div class="note-option" data-note="G4">Sol (G4)</div>
+                            <div class="note-option" data-note="A4">La (A4)</div>
+                            <div class="note-option" data-note="B4">Si (B4)</div>
+                            <div class="note-option" data-note="C5">Do (C5)</div>
+                        </div>
+                        
+                        <div class="ear-controls">
+                            <button class="ear-btn" id="playNote">
+                                <i class="fas fa-play"></i> Reproducir Nota
+                            </button>
+                            <button class="ear-btn" id="checkAnswer">
+                                <i class="fas fa-check"></i> Verificar
+                            </button>
+                            <button class="ear-btn" id="nextNote">
+                                <i class="fas fa-forward"></i> Siguiente Nota
+                            </button>
+                        </div>
+                        
+                        <div class="ear-feedback" id="feedback">
+                            <!-- Aquí se mostrará el feedback -->
+                        </div>
+                        
+                        <div class="ear-stats">
+                            <div class="ear-stat-item">
+                                <div class="ear-stat-value" id="score">0</div>
+                                <div class="ear-stat-label">Puntuación</div>
+                            </div>
+                            <div class="ear-stat-item">
+                                <div class="ear-stat-value" id="correctCount">0</div>
+                                <div class="ear-stat-label">Correctas</div>
+                            </div>
+                            <div class="ear-stat-item">
+                                <div class="ear-stat-value" id="incorrectCount">0</div>
+                                <div class="ear-stat-label">Incorrectas</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botón para volver al menú principal -->
+                <button class="back-to-menu-btn" id="backToMenuFromEar">
+                    <i class="fas fa-home"></i>
+                    Volver al Menú Principal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged,
+            updateProfile,
+            sendEmailVerification,
+            sendPasswordResetEmail,
+            GoogleAuthProvider,
+            GithubAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore,
+            doc,
+            setDoc,
+            getDoc,
+            updateDoc,
+            serverTimestamp,
+            collection,
+            getDocs,
+            query,
+            where,
+            increment
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        console.log("🚀 Firebase Modular v10 cargando para aprendizaje...");
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3hn3WNnsINtpNao1iMUjqUzU_pcu6f_o",
+            authDomain: "guitarra-6f6a4.firebaseapp.com",
+            projectId: "guitarra-6f6a4",
+            storageBucket: "guitarra-6f6a4.firebasestorage.app",
+            messagingSenderId: "716244582906",
+            appId: "1:716244582906:web:ddd0941ab7c77c5fe0a443"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            
+            console.log("✅ Firebase App inicializada:", app.name);
+            console.log("✅ Firebase Auth disponible");
+            console.log("✅ Firestore disponible");
+            
+            window.firebaseAuth = auth;
+            window.firebaseApp = app;
+            window.firebaseDb = db;
+            window.firebaseModules = {
+                createUserWithEmailAndPassword,
+                signInWithEmailAndPassword,
+                signOut,
+                onAuthStateChanged,
+                updateProfile,
+                sendEmailVerification,
+                sendPasswordResetEmail,
+                GoogleAuthProvider,
+                GithubAuthProvider,
+                signInWithPopup,
+                doc,
+                setDoc,
+                getDoc,
+                updateDoc,
+                serverTimestamp,
+                collection,
+                getDocs,
+                query,
+                where,
+                increment
+            };
+            
+            window.firebaseReady = true;
+            console.log("🎉 Firebase Modular v10 listo para usar con sistema de puntos");
+            
+        } catch (error) {
+            console.error("❌ Error inicializando Firebase Modular:", error);
+            window.firebaseReady = false;
+        }
+    </script>
+    
+    <!-- SOLO ESTE JS - el específico para aprendizaje -->
+    <script src="js/aprendizaje.js" defer></script>
+</body>
+</html>
