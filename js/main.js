@@ -3212,6 +3212,7 @@ async function loadAllUsers() {
 }
 
 // Actualizar tabla de usuarios
+// Actualizar tabla de usuarios - VERSIÓN CORREGIDA
 function updateUsersTable() {
     const usersList = document.getElementById('users-list');
     if (!usersList || !adminUsers.length) {
@@ -3238,6 +3239,12 @@ function updateUsersTable() {
             lastActivity.toLocaleDateString() + ' ' + lastActivity.toLocaleTimeString().substring(0, 5) : 
             'Nunca';
         
+        // CORRECCIÓN: Usar las clases CSS correctas para los badges
+        const roleClass = isAdmin ? 'admin' : 'estudiante';
+        const roleText = isAdmin ? 'Administrador' : 'Estudiante';
+        const statusClass = isActive ? 'active' : 'inactive';
+        const statusText = isActive ? 'Activo' : 'Inactivo';
+        
         const row = document.createElement('tr');
         
         row.innerHTML = `
@@ -3260,8 +3267,8 @@ function updateUsersTable() {
             <td>${user.email}</td>
             <td>${registerDate}</td>
             <td>${lastAccess}</td>
-            <td><span class="role-badge-cell ${isAdmin ? 'admin' : 'estudiante'}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
-            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td><span class="role-badge-cell ${roleClass}">${roleText}</span></td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
                 <div class="user-actions">
                     <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
@@ -3318,6 +3325,7 @@ function updateAdminStats() {
 }
 
 // Filtrar usuarios por búsqueda
+// Filtrar usuarios por búsqueda - VERSIÓN CORREGIDA
 function filterUsers() {
     const searchTerm = document.getElementById('user-search').value.toLowerCase().trim();
     const usersList = document.getElementById('users-list');
@@ -3359,6 +3367,12 @@ function filterUsers() {
         
         const row = document.createElement('tr');
         
+        // CORRECCIÓN: Usar las clases CSS correctas para los badges
+        const roleClass = isAdmin ? 'admin' : 'estudiante';
+        const roleText = isAdmin ? 'Administrador' : 'Estudiante';
+        const statusClass = isActive ? 'active' : 'inactive';
+        const statusText = isActive ? 'Activo' : 'Inactivo';
+        
         row.innerHTML = `
             <td>
                 <div class="user-info-cell">
@@ -3379,8 +3393,8 @@ function filterUsers() {
             <td>${user.email}</td>
             <td>${registerDate}</td>
             <td>${lastAccess}</td>
-            <td><span class="role-badge-cell ${user.role}">${isAdmin ? 'Administrador' : 'Estudiante'}</span></td>
-            <td><span class="status-badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></td>
+            <td><span class="role-badge-cell ${roleClass}">${roleText}</span></td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
                 <div class="user-actions">
                     <button class="action-icon-btn" onclick="editUser('${user.id}')" title="Editar">
