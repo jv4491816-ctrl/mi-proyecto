@@ -177,8 +177,9 @@ function validatePasswordMatch() {
 
 // Función para validar toda la contraseña (fortaleza + coincidencia)
 function validateCompletePassword() {
-    const password = document.getElementById('modalSignupPassword')?.value || '';
-    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value || '';
+    const email = document.getElementById('modalSignupEmail')?.value.trim() || '';
+    const password = document.getElementById('modalSignupPassword')?.value;
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value;
     const passwordError = document.getElementById('modalSignupPasswordError');
     const confirmError = document.getElementById('modalSignupConfirmPasswordError');
     
@@ -186,18 +187,28 @@ function validateCompletePassword() {
     if (passwordError) passwordError.textContent = '';
     if (confirmError) confirmError.textContent = '';
     
+    // BLOQUEAR EMAILS ADMIN (verificación redundante por seguridad)
+    if (ADMIN_EMAILS.includes(email?.toLowerCase())) {
+        const emailError = document.getElementById('modalSignupEmailError');
+        if (emailError) {
+            emailError.textContent = '❌ Email reservado para administradores';
+            emailError.style.color = 'var(--accent-red)';
+        }
+        return false;
+    }
+    
     // Validar longitud mínima
-    if (password.length < 8) {
+    if (password && password.length < 8) {
         if (passwordError) passwordError.textContent = 'La contraseña debe tener al menos 8 caracteres';
         return false;
     }
     
     // Validar reglas de complejidad
     const rules = {
-        upper: /[A-Z]/.test(password),
-        lower: /[a-z]/.test(password),
-        number: /\d/.test(password),
-        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+        upper: /[A-Z]/.test(password || ''),
+        lower: /[a-z]/.test(password || ''),
+        number: /\d/.test(password || ''),
+        symbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password || '')
     };
     
     const missingRules = [];
@@ -247,6 +258,110 @@ const ADMIN_EMAILS = [
     'fraylingay@gmail.com',
     'admin@demo.com'
 ];
+
+// ========== FUNCIONES DE VERIFICACIÓN DE EMAIL ==========
+
+// Verificar si un email está disponible (no admin y no registrado)
+async function checkEmailAvailable(email) {
+    // 1. Verificar si es email admin (BLOQUEAR)
+    if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        return {
+            available: false,
+            reason: 'admin-reserved',
+            message: 'Este email está reservado para administradores existentes.'
+        };
+    }
+    
+    // 2. Verificar si ya está registrado
+    const firebase = useFirebase();
+    
+    if (firebase.isAvailable) {
+        try {
+            const methods = await firebase.modules.fetchSignInMethodsForEmail(firebase.auth, email);
+            
+            if (methods && methods.length > 0) {
+                return {
+                    available: false,
+                    reason: 'already-registered',
+                    message: 'Este email ya está registrado. Inicia sesión o usa otro email.'
+                };
+            }
+            
+            // Email disponible
+            return {
+                available: true,
+                reason: 'available',
+                message: 'Email disponible'
+            };
+            
+        } catch (error) {
+            console.warn('Error verificando email en Firebase:', error);
+            // Si no se puede verificar, permitir continuar
+            return {
+                available: true,
+                reason: 'verification-failed',
+                message: 'No se pudo verificar el email. Puedes intentar continuar.'
+            };
+        }
+    } else {
+        // Modo local
+        const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        if (savedUser && savedUser.email === email) {
+            return {
+                available: false,
+                reason: 'already-registered-local',
+                message: 'Este email ya está registrado localmente.'
+            };
+        }
+        
+        return {
+            available: true,
+            reason: 'available-local',
+            message: 'Email disponible (modo local)'
+        };
+    }
+}
+
+// Validar formulario de registro completo
+async function validateSignupForm() {
+    const name = document.getElementById('modalSignupName')?.value.trim();
+    const email = document.getElementById('modalSignupEmail')?.value.trim();
+    const password = document.getElementById('modalSignupPassword')?.value;
+    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value;
+    
+    const errors = [];
+    
+    // Validar nombre
+    if (!name || name.length < 2) {
+        errors.push('Nombre debe tener al menos 2 caracteres');
+    }
+    
+    // Validar email
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push('Email inválido');
+    } else if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        errors.push('❌ Email reservado para administradores');
+    }
+    
+    // Validar contraseña
+    if (!validateCompletePassword()) {
+        errors.push('La contraseña no cumple los requisitos');
+    }
+    
+    // Verificar disponibilidad del email
+    if (email && !ADMIN_EMAILS.includes(email.toLowerCase())) {
+        const availability = await checkEmailAvailable(email);
+        if (!availability.available) {
+            errors.push(availability.message);
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors: errors,
+        data: { name, email, password, confirmPassword }
+    };
+}
 
 // ========== SISTEMA DE ESTADO DE FIREBASE ==========
 const firebaseState = {
@@ -333,6 +448,9 @@ function useFirebase() {
 
 // Verificar si un usuario es administrador
 async function checkIfUserIsAdmin(email) {
+    if (!email) return false;
+    
+    // Primero verificar en la lista local de emails admin
     if (ADMIN_EMAILS.includes(email.toLowerCase())) {
         return true;
     }
@@ -342,10 +460,26 @@ async function checkIfUserIsAdmin(email) {
     return await firebase.safeOperation(
         'check-admin',
         async () => {
-            const adminDoc = await firebase.modules.getDoc(
-                firebase.modules.doc(firebase.db, 'admins', email.toLowerCase())
-            );
-            return adminDoc.exists();
+            try {
+                // Verificar en colección 'admins' si existe
+                const adminDoc = await firebase.modules.getDoc(
+                    firebase.modules.doc(firebase.db, 'admins', email.toLowerCase())
+                );
+                
+                // También verificar en colección 'users' si tiene rol admin
+                const usersQuery = firebase.modules.query(
+                    firebase.modules.collection(firebase.db, 'users'),
+                    firebase.modules.where('email', '==', email.toLowerCase()),
+                    firebase.modules.where('role', '==', 'admin')
+                );
+                
+                const usersSnapshot = await firebase.modules.getDocs(usersQuery);
+                
+                return adminDoc.exists() || !usersSnapshot.empty;
+            } catch (error) {
+                console.warn("Error verificando admin en Firestore:", error);
+                return false;
+            }
         },
         false
     );
@@ -358,6 +492,20 @@ async function saveUserToFirestore(user) {
     return await firebase.safeOperation(
         'save-user',
         async () => {
+            // VERIFICACIÓN FINAL DE SEGURIDAD: Bloquear emails admin
+            if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+                console.error('❌ Intento de registro con email admin bloqueado:', user.email);
+                
+                // IMPORTANTE: Eliminar el usuario recién creado si pasa la validación
+                try {
+                    await firebase.modules.deleteUser(user);
+                } catch (deleteError) {
+                    console.error('Error eliminando usuario no autorizado:', deleteError);
+                }
+                
+                throw new Error('auth/admin-email-restricted');
+            }
+            
             const userRef = firebase.modules.doc(firebase.db, 'users', user.uid);
             const userSnap = await firebase.modules.getDoc(userRef);
             
@@ -672,6 +820,14 @@ async function handleFirebaseUser(user) {
     localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUser));
     updateUIForUser(currentUser);
     
+    // Notificar si es admin
+    if (isAdmin) {
+        console.log("👑 Usuario es administrador:", currentUser.email);
+        showNotification(`¡Bienvenido Administrador ${currentUser.firstName}! 👑`, 'success');
+    } else {
+        console.log("👤 Usuario es estudiante:", currentUser.email);
+    }
+    
     console.log("✅ Usuario procesado:", currentUser.firstName, "Rol:", currentUser.role);
 }
 
@@ -770,14 +926,24 @@ const uiUpdater = {
 // Actualizar UI según usuario
 async function updateUIForUser(user) {
     if (user) {
-        uiUpdater.updateUserInfo(user);
-        
+        // Verificar si es admin (esto es redundante pero asegura consistencia)
         const isAdmin = await checkIfUserIsAdmin(user.email);
+        
+        // Actualizar rol si es necesario
+        if (user.role !== 'admin' && isAdmin) {
+            user.role = 'admin';
+            localStorage.setItem('guitarraFacilUser', JSON.stringify(user));
+        }
+        
+        uiUpdater.updateUserInfo(user);
         uiUpdater.updateAdminVisibility(isAdmin);
         
         if (!isAdmin) {
             updateStudentStats();
         }
+        
+        // Log para debugging
+        console.log(`👤 UI Actualizada para: ${user.email}, Rol: ${user.role}, Es Admin: ${isAdmin}`);
     } else {
         uiUpdater.updateUserInfo(null);
         uiUpdater.updateAdminVisibility(false);
@@ -840,6 +1006,12 @@ function handleLocalLogin(email, password) {
 function handleLocalSignup(name, email, password) {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
+            // BLOQUEAR emails admin en modo local también
+            if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+                reject(new Error('auth/admin-email-restricted'));
+                return;
+            }
+            
             const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
             
             currentUser = {
@@ -1112,6 +1284,105 @@ function setupFormEvents() {
             confirmPasswordInput.addEventListener('input', validatePasswordMatch);
         }
         
+        // Validación en tiempo real de email
+        const emailInput = document.getElementById('modalSignupEmail');
+        if (emailInput) {
+            let validationTimeout;
+            
+            emailInput.addEventListener('input', function() {
+                clearTimeout(validationTimeout);
+                const email = this.value.trim();
+                const errorElement = document.getElementById('modalSignupEmailError');
+                const submitBtn = document.getElementById('modalSignupSubmitBtn');
+                
+                // Limpiar errores previos
+                if (errorElement) errorElement.textContent = '';
+                
+                if (!email) {
+                    return;
+                }
+                
+                // Validar formato de email
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    if (errorElement) {
+                        errorElement.textContent = 'Email inválido';
+                        errorElement.style.color = 'var(--accent-red)';
+                    }
+                    if (submitBtn) submitBtn.disabled = true;
+                    return;
+                }
+                
+                validationTimeout = setTimeout(async () => {
+                    // Primero: Verificar si es email admin (BLOQUEAR)
+                    if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+                        if (errorElement) {
+                            errorElement.innerHTML = '❌ <strong>Email reservado para administradores</strong><br><small>Si eres admin, inicia sesión. Si no, usa otro email.</small>';
+                            errorElement.style.color = 'var(--accent-red)';
+                            errorElement.style.fontWeight = 'bold';
+                        }
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.style.opacity = '0.5';
+                            submitBtn.style.cursor = 'not-allowed';
+                        }
+                        return;
+                    }
+                    
+                    // Segundo: Verificar si el email ya existe (Firestore o local)
+                    try {
+                        const firebase = useFirebase();
+                        
+                        if (firebase.isAvailable) {
+                            // Verificar en Firebase
+                            const methods = await firebase.modules.fetchSignInMethodsForEmail(firebase.auth, email);
+                            
+                            if (methods && methods.length > 0) {
+                                if (errorElement) {
+                                    errorElement.innerHTML = '⚠️ Este email ya está registrado<br><small>Si es tu cuenta, <a href="#" style="color: var(--primary-blue); text-decoration: underline;" onclick="openModal(\'login\')">inicia sesión</a></small>';
+                                    errorElement.style.color = 'var(--stage-3-color)';
+                                }
+                                if (submitBtn) {
+                                    submitBtn.disabled = true;
+                                    submitBtn.style.opacity = '0.5';
+                                }
+                                return;
+                            }
+                        } else {
+                            // Verificar en modo local
+                            const savedUser = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+                            if (savedUser && savedUser.email === email) {
+                                if (errorElement) {
+                                    errorElement.innerHTML = '⚠️ Este email ya está registrado localmente<br><small>Si es tu cuenta, <a href="#" style="color: var(--primary-blue); text-decoration: underline;" onclick="openModal(\'login\')">inicia sesión</a></small>';
+                                    errorElement.style.color = 'var(--stage-3-color)';
+                                }
+                                if (submitBtn) {
+                                    submitBtn.disabled = true;
+                                    submitBtn.style.opacity = '0.5';
+                                }
+                                return;
+                            }
+                        }
+                        
+                        // Email válido y disponible
+                        if (errorElement) errorElement.textContent = '';
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.style.opacity = '1';
+                            submitBtn.style.cursor = 'pointer';
+                        }
+                        
+                    } catch (error) {
+                        console.warn("Error verificando email:", error);
+                        // Si hay error en la verificación, permitir continuar pero mostrar advertencia
+                        if (errorElement) {
+                            errorElement.textContent = '⚠️ No se pudo verificar el email. Intenta de nuevo.';
+                            errorElement.style.color = 'var(--stage-3-color)';
+                        }
+                    }
+                }, 800); // Delay mayor para no hacer demasiadas peticiones
+            });
+        }
+        
         if (switchToLogin) {
             switchToLogin.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -1302,80 +1573,56 @@ async function handleLogin() {
 
 // Manejar registro
 async function handleSignup() {
-    const name = document.getElementById('modalSignupName')?.value.trim();
-    const email = document.getElementById('modalSignupEmail')?.value.trim();
-    const password = document.getElementById('modalSignupPassword')?.value;
-    const confirmPassword = document.getElementById('modalSignupConfirmPassword')?.value;
     const submitBtn = document.getElementById('modalSignupSubmitBtn');
-    
     if (!submitBtn) return;
-    
-    // Validar campos requeridos
-    if (!name || !email || !password || !confirmPassword) {
-        showNotification('Por favor, completa todos los campos', 'error');
-        return;
-    }
-    
-    // Validar email
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showNotification('Por favor, ingresa un email válido', 'error');
-        return;
-    }
-    
-    // Validar contraseña completa
-    if (!validateCompletePassword()) {
-        showNotification('Por favor, corrige los errores en la contraseña', 'error');
-        return;
-    }
     
     const originalContent = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
     
     try {
+        // 1. Validar formulario completo
+        const validation = await validateSignupForm();
+        
+        if (!validation.isValid) {
+            throw new Error(validation.errors.join('\n'));
+        }
+        
+        const { name, email, password } = validation.data;
+        
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
+        
+        // 2. Procesar registro
         const firebase = useFirebase();
         
         if (firebase.isAvailable) {
-            await firebase.safeOperation(
-                'signup',
-                async () => {
-                    const userCredential = await firebase.modules.createUserWithEmailAndPassword(
-                        firebase.auth, email, password
-                    );
-                    const user = userCredential.user;
-                    
-                    await firebase.modules.updateProfile(user, { displayName: name });
-                    await firebase.modules.sendEmailVerification(user);
-                    
-                    return user;
-                },
-                async () => {
-                    return await handleLocalSignup(name, email, password);
-                }
+            // PRIMERO: Verificación final antes de crear cuenta
+            if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+                throw new Error('auth/admin-email-restricted');
+            }
+            
+            // Registro con Firebase
+            const userCredential = await firebase.modules.createUserWithEmailAndPassword(
+                firebase.auth, email, password
             );
+            const user = userCredential.user;
             
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
-            submitBtn.classList.add('success-btn');
-            
-            setTimeout(() => {
-                closeModal();
-                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente. Hemos enviado un email de verificación.`, 'success');
-            }, 1500);
+            await firebase.modules.updateProfile(user, { displayName: name });
+            await saveUserToFirestore(user);
             
         } else {
+            // Registro local
             await handleLocalSignup(name, email, password);
-            
-            submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
-            submitBtn.classList.add('success-btn');
-            
-            const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-            const roleMsg = isAdmin ? 'Administrador' : 'Estudiante';
-            
-            setTimeout(() => {
-                closeModal();
-                showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente en modo local.\nEmail: ${email}\nRol: ${roleMsg}`, 'success');
-            }, 1000);
         }
+        
+        // 3. Éxito
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> ¡Cuenta creada!';
+        submitBtn.classList.add('success-btn');
+        
+        setTimeout(() => {
+            closeModal();
+            showNotification(`¡Bienvenido ${name.split(' ')[0]}! 🎸\nCuenta creada exitosamente.`, 'success');
+        }, 1500);
         
     } catch (error) {
         console.error('❌ Error en registro:', error);
@@ -1383,23 +1630,41 @@ async function handleSignup() {
         submitBtn.innerHTML = '<i class="fas fa-times"></i> Error';
         submitBtn.classList.add('error-btn');
         
+        // Mensajes de error específicos
         let errorMessage = 'Error al crear la cuenta';
-        
-        const errorMessages = {
-            'auth/email-already-in-use': 'Este email ya está registrado',
+        const errorMap = {
+            'auth/email-already-in-use': 'Este email ya está registrado. Por favor, inicia sesión o usa otro email.',
+            'auth/admin-email-restricted': '❌ Email reservado para administradores. Usa otro email.',
             'auth/invalid-email': 'Email inválido',
             'auth/weak-password': 'Contraseña muy débil. Debe tener al menos 8 caracteres con mayúsculas, minúsculas, números y símbolos.',
-            'auth/operation-not-allowed': 'El registro con email/contraseña no está habilitado'
+            'auth/operation-not-allowed': 'El registro con email/contraseña no está habilitado',
+            'Este email ya está registrado en modo local': 'Este email ya está registrado localmente.'
         };
         
-        errorMessage = errorMessages[error.code] || errorMessage;
+        errorMessage = errorMap[error.code] || errorMap[error.message] || error.message || errorMessage;
+        
+        // Limpiar campos si es error de email
+        if (error.code === 'auth/email-already-in-use' || 
+            error.code === 'auth/admin-email-restricted' ||
+            error.message.includes('Email reservado') ||
+            error.message.includes('ya está registrado')) {
+            
+            const emailInput = document.getElementById('modalSignupEmail');
+            if (emailInput) emailInput.value = '';
+            
+            const emailError = document.getElementById('modalSignupEmailError');
+            if (emailError) {
+                emailError.textContent = errorMessage.split('\n')[0];
+                emailError.style.color = 'var(--accent-red)';
+            }
+        }
         
         setTimeout(() => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalContent;
             submitBtn.classList.remove('error-btn');
             showNotification(errorMessage, 'error');
-        }, 1000);
+        }, 2000);
     }
 }
 
