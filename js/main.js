@@ -3529,19 +3529,74 @@ async function toggleUserRole(userId, userEmail) {
     }
 }
 
-// Editar usuario
-function editUser(userId) {
+
+// Editar usuario - FUNCIÓN ACTUALIZADA PARA FIREBASE
+async function editUser(userId) {
     const user = adminUsers.find(u => u.id === userId);
     if (!user) return;
     
-    const newName = prompt('Nuevo nombre para el usuario:', user.displayName || '');
-    if (newName === null) return;
+    const newName = prompt('Nuevo nombre para el usuario:', user.displayName || user.email.split('@')[0]);
+    if (newName === null || !newName.trim()) return;
     
-    if (newName.trim()) {
-        user.displayName = newName.trim();
-        userCache.set('allUsers', adminUsers);
-        updateUsersTable();
-        showNotification('✅ Nombre actualizado correctamente', 'success');
+    const trimmedName = newName.trim();
+    
+    try {
+        const firebase = useFirebase();
+        
+        if (firebase.isAvailable) {
+            // Actualizar en Firestore
+            await firebase.safeOperation(
+                'update-user-name',
+                async () => {
+                    await firebase.modules.updateDoc(
+                        firebase.modules.doc(firebase.db, 'users', userId),
+                        { 
+                            displayName: trimmedName,
+                            updatedAt: firebase.modules.serverTimestamp()
+                        }
+                    );
+                    return true;
+                },
+                false
+            );
+            
+            // Actualizar en la lista local
+            user.displayName = trimmedName;
+            
+            // Si el usuario tiene nombre en la propiedad 'name' también
+            if (user.name) {
+                user.name = trimmedName;
+            }
+            
+            // Actualizar cache
+            userCache.set('allUsers', adminUsers);
+            
+            // Actualizar tabla
+            updateUsersTable();
+            
+            // Si el usuario editado es el usuario actual, actualizar localStorage
+            const currentUserData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+            if (currentUserData && currentUserData.uid === userId) {
+                currentUserData.displayName = trimmedName;
+                currentUserData.name = trimmedName;
+                currentUserData.firstName = trimmedName.split(' ')[0];
+                localStorage.setItem('guitarraFacilUser', JSON.stringify(currentUserData));
+                updateUIForUser(currentUserData);
+            }
+            
+            showNotification(`✅ Nombre actualizado a: ${trimmedName}`, 'success');
+            
+        } else {
+            // Modo offline - actualizar solo localmente
+            user.displayName = trimmedName;
+            userCache.set('allUsers', adminUsers);
+            updateUsersTable();
+            showNotification(`✅ Nombre actualizado localmente: ${trimmedName}`, 'info');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error actualizando nombre en Firebase:', error);
+        showNotification('Error al actualizar el nombre. Intenta de nuevo.', 'error');
     }
 }
 
