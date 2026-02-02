@@ -324,7 +324,74 @@ async function handleChangeName(e) {
     }
 }
 
-// ========== GRÁFICOS CON CHART.JS ==========
+// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN - CORREGIDAS ==========
+window.manageUsers = function() {
+    // Mostrar el panel de administración completo
+    showPage('admin-panel-page');
+    
+    // Asegurarse de que los gráficos se carguen correctamente
+    setTimeout(() => {
+        if (adminUsers && adminUsers.length > 0) {
+            initializeCharts();
+        } else {
+            loadAllUsers();
+        }
+    }, 500);
+    
+    showNotification('📋 Panel de gestión de usuarios cargado', 'info');
+};
+
+window.manageContent = function() {
+    // Navegar a la página de mensajes del admin para gestionar contenido
+    showPage('foro');
+    
+    // Asegurarse de que el formulario de admin sea visible
+    setTimeout(() => {
+        const askSection = document.querySelector('.ask-section');
+        const studentMessage = document.querySelector('.student-only');
+        const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+        const isAdmin = userData && userData.role === 'admin';
+        
+        if (askSection && studentMessage) {
+            if (isAdmin) {
+                askSection.style.display = 'block';
+                studentMessage.style.display = 'none';
+            }
+        }
+    }, 300);
+    
+    showNotification('📝 Redirigiendo a gestión de contenido (Mensajes del Admin)', 'info');
+};
+
+window.viewStatistics = function() {
+    // Mostrar el panel de administración y enfocarse en las estadísticas
+    showPage('admin-panel-page');
+    
+    // Desplazar hacia la sección de estadísticas
+    setTimeout(() => {
+        const statsSection = document.querySelector('.admin-section:nth-child(4)');
+        if (statsSection) {
+            statsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Asegurarse de que los gráficos se carguen
+        if (adminUsers && adminUsers.length > 0) {
+            initializeCharts();
+        } else {
+            loadAllUsers();
+        }
+    }, 500);
+    
+    showNotification('📊 Redirigiendo a estadísticas detalladas', 'info');
+};
+
+// Función global para recargar usuarios
+window.refreshUsersList = function() {
+    console.log("🔄 Recargando lista de usuarios...");
+    userCache.clear(); // Limpiar caché
+    loadAllUsers();
+    showNotification('Lista de usuarios actualizada', 'success');
+};
 
 // ========== GRÁFICOS CON CHART.JS - VERSIÓN CORREGIDA ==========
 
@@ -3516,7 +3583,7 @@ async function deleteUser(userId, userEmail) {
 }
 
 // Exportar datos de usuarios
-function exportUsers() {
+window.exportUsers = function() {
     const csvContent = [
         ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Estado'],
         ...adminUsers.map(user => [
@@ -3543,7 +3610,7 @@ function exportUsers() {
 }
 
 // Generar reporte mensual
-function generateReport() {
+window.generateReport = function() {
     const today = new Date();
     const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
     
@@ -3557,7 +3624,7 @@ function generateReport() {
 }
 
 // Respaldar base de datos
-function backupDatabase() {
+window.backupDatabase = function() {
     const backupData = {
         timestamp: new Date().toISOString(),
         totalUsers: adminUsers.length,
@@ -3576,36 +3643,6 @@ function backupDatabase() {
     
     showNotification('✅ Respaldo de base de datos generado y descargado', 'success');
 }
-
-// ========== FUNCIONES GLOBALES DEL PANEL DE ADMINISTRACIÓN ==========
-window.manageUsers = function() {
-    showPage('admin-panel-page');
-};
-
-window.manageContent = function() {
-    showNotification('📚 Redirigiendo a gestión de contenido...', 'info');
-};
-
-window.viewStatistics = function() {
-    showNotification('📊 Redirigiendo a estadísticas...', 'info');
-};
-
-// Función global para recargar usuarios
-window.refreshUsersList = function() {
-    console.log("🔄 Recargando lista de usuarios...");
-    userCache.clear(); // Limpiar caché
-    loadAllUsers();
-    showNotification('Lista de usuarios actualizada', 'success');
-};
-
-window.exportUsers = exportUsers;
-window.generateReport = generateReport;
-window.backupDatabase = backupDatabase;
-window.refreshMessages = refreshMessages;
-window.closeChangeNameModal = closeChangeNameModal;
-
-// También puedes mantener la función original como global si necesitas compatibilidad
-window.loadAllUsers = loadAllUsers;
 
 // ========== AFINADOR MEJORADO ==========
 
@@ -4433,6 +4470,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
     
+    // Verificar que los botones de admin estén configurados
+    setTimeout(() => {
+        const adminButtons = document.querySelectorAll('.admin-actions .btn');
+        adminButtons.forEach(btn => {
+            // Asegurarse de que los botones tengan los eventos correctos
+            if (!btn.getAttribute('onclick')) {
+                const text = btn.textContent;
+                if (text.includes('Usuarios')) {
+                    btn.setAttribute('onclick', 'window.manageUsers()');
+                } else if (text.includes('Contenido')) {
+                    btn.setAttribute('onclick', 'window.manageContent()');
+                } else if (text.includes('Estadísticas')) {
+                    btn.setAttribute('onclick', 'window.viewStatistics()');
+                }
+            }
+        });
+    }, 1000);
+    
     // Efecto de escritura en el hero
     const heroText = document.querySelector('.hero h1');
     if (heroText) {
@@ -4451,3 +4506,43 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(typeWriter, 500);
     }
 });
+
+// Función de diagnóstico para verificar los botones
+function diagnoseAdminButtons() {
+    console.log("🔍 DIAGNÓSTICO DE BOTONES DE ADMIN:");
+    
+    // Verificar que las funciones globales existan
+    console.log("1. window.manageUsers:", typeof window.manageUsers);
+    console.log("2. window.manageContent:", typeof window.manageContent);
+    console.log("3. window.viewStatistics:", typeof window.viewStatistics);
+    
+    // Verificar que los botones existan en el DOM
+    const adminPanel = document.getElementById('admin-panel');
+    if (adminPanel) {
+        console.log("4. Panel de admin encontrado en el DOM");
+        
+        const buttons = adminPanel.querySelectorAll('.btn');
+        console.log(`5. ${buttons.length} botones encontrados en el panel`);
+        
+        buttons.forEach((btn, index) => {
+            console.log(`   Botón ${index + 1}: "${btn.textContent}" - onclick: ${btn.getAttribute('onclick')}`);
+        });
+    } else {
+        console.log("4. ❌ Panel de admin NO encontrado en el DOM");
+    }
+    
+    // Verificar usuario actual
+    const userData = JSON.parse(localStorage.getItem('guitarraFacilUser'));
+    console.log("6. Usuario actual:", userData ? `${userData.email} (${userData.role})` : "No autenticado");
+    
+    // Verificar si el panel de admin está visible
+    console.log("7. Panel de admin visible:", adminPanel && adminPanel.style.display !== 'none' ? 'Sí' : 'No');
+}
+
+// Hacer la función disponible globalmente
+window.diagnoseAdminButtons = diagnoseAdminButtons;
+
+// También puedes mantener la función original como global si necesitas compatibilidad
+window.loadAllUsers = loadAllUsers;
+window.refreshMessages = refreshMessages;
+window.closeChangeNameModal = closeChangeNameModal;
