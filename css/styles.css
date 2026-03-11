@@ -2954,7 +2954,6 @@ footer {
     flex-direction: column;
 }
 
-/* Título del álbum */
 .album-title {
     color: var(--text-white);
     font-size: 1.1rem;
@@ -2963,13 +2962,11 @@ footer {
     line-height: 1.4;
 
     /* limitar texto a 2 líneas */
-   .album-title {
     display: -webkit-box;
-    -webkit-line-clamp: 2; /* para Chrome, Edge, Safari */
-    line-clamp: 2; /* propiedad estándar recomendada */
+    -webkit-line-clamp: 2;
+     line-clamp: 2; /* propiedad estándar */
     -webkit-box-orient: vertical;
     overflow: hidden;
-}
 
     height: 3em;
 }
