@@ -1283,22 +1283,27 @@ nav {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* ========== CORRECCIÓN: BADGE DE ROL ========== */
 .role-badge-cell {
-    padding: 4px 8px;
-    border-radius: 12px;
+    padding: 6px 12px;
+    border-radius: 15px;
     font-size: 0.75rem;
     font-weight: 600;
     display: inline-block;
+    min-width: 100px;
+    text-align: center;
 }
 
 .role-badge-cell.admin {
     background: rgba(251, 188, 4, 0.2);
     color: var(--stage-3-color);
+    border: 1px solid rgba(251, 188, 4, 0.3);
 }
 
-.role-badge-cell.student {
+.role-badge-cell.estudiante {
     background: rgba(26, 115, 232, 0.2);
     color: var(--primary-blue);
+    border: 1px solid rgba(26, 115, 232, 0.3);
 }
 
 .status-badge {
@@ -1391,50 +1396,180 @@ nav {
     background: rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s;
+}
+
+.stat-box:hover {
+    border-color: var(--primary-blue);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .stat-box h4 {
     color: var(--text-white);
     margin-bottom: 1rem;
     font-size: 1.1rem;
-}
-
-.activity-chart {
+    font-weight: 600;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
-    height: 150px;
-    padding: 1rem 0;
 }
 
-.chart-bar {
-    flex: 1;
-    background: linear-gradient(to top, var(--primary-blue), #5e97f6);
-    border-radius: 4px 4px 0 0;
-    min-height: 20px;
-    transition: height 0.3s;
+.stat-box h4 i {
+    color: var(--primary-blue);
 }
 
+/* ========== ESTILOS PARA GRÁFICOS DE PASTEL ========== */
+
+/* Contenedor principal para gráficos de pastel */
 .role-distribution {
+    margin-top: 15px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .role-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .role-dot {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: var(--primary-blue);
+    display: inline-block;
+}
+
+/* Contenedores específicos para gráficos de pastel */
+#rolePieChart, #activityPieChart, #activityBarChart {
+    width: 100% !important;
+    height: 200px !important;
+}
+
+/* Contenedor para gráfico de barras de actividad */
+#activityBarChart {
+    width: 100% !important;
+    height: 250px !important;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    padding: 15px;
+}
+
+/* Leyendas personalizadas para gráficos */
+.chartjs-legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.chartjs-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.chartjs-legend-marker {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+/* Estilos específicos para el tooltip de Chart.js */
+.chartjs-tooltip {
+    background: rgba(10, 25, 49, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    backdrop-filter: blur(10px) !important;
+    color: var(--text-white) !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+}
+
+.chartjs-tooltip-key {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 8px;
+}
+
+/* Ajuste de colores para Chart.js en modo oscuro */
+.chartjs-render-monitor {
+    filter: brightness(0.95);
+}
+
+/* Estilos para gráficos de pastel con leyenda personalizada */
+.pie-legend-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.pie-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pie-legend-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+/* Estados vacíos para gráficos */
+.chart-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+}
+
+.chart-empty-state i {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.chart-empty-state p {
+    font-size: 0.9rem;
+}
+
+/* Mejoras para los textos dentro de los gráficos */
+.chartjs-text {
+    fill: var(--text-white) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Ejes de gráficos de barras */
+.chartjs-axis {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Grid de gráficos */
+.chartjs-grid {
+    border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ========== FOOTER MODERNO ========== */
@@ -2273,6 +2408,63 @@ footer {
     color: var(--accent-red);
 }
 
+/* ========== ACTIVITY BADGES ========== */
+.user-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-active {
+    background-color: #34a853;
+    animation: pulse 1.5s infinite;
+}
+
+.status-inactive {
+    background-color: #ea4335;
+}
+
+/* ========== CHART STYLES ========== */
+.chart-wrapper {
+    position: relative;
+    height: 250px;
+    margin: 1rem 0;
+}
+
+.chart-container {
+    height: 100%;
+    width: 100%;
+}
+
+.chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
     .nav-links {
@@ -2446,6 +2638,32 @@ footer {
         grid-template-columns: 1fr;
     }
     
+    /* Gráficos responsive */
+    #rolePieChart, #activityPieChart {
+        height: 180px !important;
+    }
+    
+    #activityBarChart {
+        height: 200px !important;
+    }
+    
+    .chart-wrapper {
+        height: 200px;
+    }
+    
+    .chart-legend {
+        font-size: 0.7rem;
+    }
+    
+    .pie-legend-container {
+        gap: 8px;
+    }
+    
+    .pie-legend-item {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+    }
+    
     .users-table td,
     .users-table th {
         padding: 12px 15px;
@@ -2541,6 +2759,23 @@ footer {
     .question-title {
         font-size: 1.1rem;
     }
+    
+    /* Gráficos responsive móvil */
+    #rolePieChart, #activityPieChart {
+        height: 150px !important;
+    }
+    
+    #activityBarChart {
+        height: 180px !important;
+    }
+    
+    .chart-wrapper {
+        height: 180px;
+    }
+    
+    .stat-box {
+        padding: 1rem;
+    }
 }
 
 /* ========== HAMBURGER MENU ========== */
@@ -2572,4 +2807,40 @@ footer {
 
 .floating {
     animation: float 3s ease-in-out infinite;
+}
+
+/* ========== CHANGE NAME MODAL ========== */
+#changeNameModal .modal-container {
+    max-width: 400px;
+}
+
+#changeNameModal .modal-form-section {
+    padding: 30px 25px;
+}
+
+/* ========== GRID FOR PIE CHARTS ========== */
+.pie-charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.pie-chart-wrapper {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.pie-chart-title {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--text-white);
+    font-weight: 600;
+}
+
+.pie-chart-canvas {
+    height: 200px;
+    position: relative;
 }
