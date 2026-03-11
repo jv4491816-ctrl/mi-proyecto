@@ -31,6 +31,9 @@
                 <li><a href="#" class="nav-link" data-page="partituras">Partituras</a></li>
                 <li><a href="#" class="nav-link" data-page="aprendizaje">Aprendizaje</a></li>
                 <li><a href="#" class="nav-link" data-page="guitarra">Guitarra</a></li>
+                <li><a href="#" class="nav-link" data-page="albumes-page">Álbumes</a></li> <!-- Elemento del menú que permite acceder a la sección "Álbumes de Guitarra".
+                El atributo data-page indica qué subpágina se debe mostrar con JavaScript. -->
+
                 
                 <!-- Panel Admin SOLO para usuarios admin -->
                 <li id="admin-nav-item" style="display: none;">
@@ -576,6 +579,140 @@
             </div>
         </div>
 
+       
+
+       <!-- ======================================================
+     SUBPÁGINA: BUSCADOR DE ÁLBUMES DE GUITARRA
+     Esta sección permite al usuario buscar álbumes de guitarra.
+     Los resultados se obtienen desde una API externa (iTunes)
+     mediante JavaScript y se muestran dinámicamente en la página.
+====================================================== -->
+
+<!-- Contenedor principal de la subpágina -->
+<div id="albumes-page" class="page">
+
+    <!-- Botón de navegación para regresar a la página principal -->
+    <!-- El atributo data-page permite cambiar de sección usando JavaScript -->
+    <a href="#" class="back-btn" data-page="index">
+        <i class="fas fa-arrow-left"></i> Volver al Inicio
+    </a>
+    
+    <!-- Encabezado de la sección con título y descripción -->
+    <!-- Explica al usuario qué puede hacer en esta parte del sitio -->
+    <div class="section-title">
+        <h2>🎸 Álbumes de Guitarra</h2>
+        <p>Descubre los mejores álbumes de guitarra de todos los géneros</p>
+    </div>
+
+    <!-- Contenedor principal que agrupa el buscador, resultados y estadísticas -->
+    <div class="albumes-container">
+
+        <!-- ======================================================
+             SECCIÓN DE BÚSQUEDA
+             Permite al usuario escribir el nombre de un género,
+             estilo o tipo de guitarra para buscar álbumes.
+        ====================================================== -->
+        <div class="search-section" style="max-width: 600px; margin: 0 auto 2rem;">
+            
+            <!-- Contenedor del input y botón de búsqueda -->
+            <!-- flex se usa para que ambos elementos estén en la misma línea -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                
+                <!-- Campo donde el usuario escribe la búsqueda -->
+                <!-- Este valor será leído por JavaScript para consultar la API -->
+                <input type="text" id="albumSearchInput" 
+                       placeholder="Buscar álbumes de guitarra (ej: rock, flamenco, clásico)" 
+                       style="flex: 1; padding: 15px; border-radius: 10px; border: 2px solid var(--primary-blue); background: rgba(255,255,255,0.1); color: white;">
+                
+                <!-- Botón que ejecuta la función buscarAlbumes() -->
+                <!-- Esta función hace la petición a la API -->
+                <button onclick="buscarAlbumes()" class="btn" style="padding: 15px 30px;">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+            </div>
+            
+            <!-- ======================================================
+                 FILTROS RÁPIDOS
+                 Botones que permiten hacer búsquedas rápidas
+                 por géneros populares de guitarra.
+            ====================================================== -->
+            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+                
+                <!-- Cada botón ejecuta una función que busca álbumes
+                     automáticamente usando el género seleccionado -->
+                <button onclick="buscarAlbumesPorGenero('rock')" class="btn-outline btn-sm">Rock</button>
+                <button onclick="buscarAlbumesPorGenero('flamenco')" class="btn-outline btn-sm">Flamenco</button>
+                <button onclick="buscarAlbumesPorGenero('jazz')" class="btn-outline btn-sm">Jazz</button>
+                <button onclick="buscarAlbumesPorGenero('clasica')" class="btn-outline btn-sm">Clásica</button>
+                <button onclick="buscarAlbumesPorGenero('blues')" class="btn-outline btn-sm">Blues</button>
+                <button onclick="buscarAlbumesPorGenero('acustica')" class="btn-outline btn-sm">Acústica</button>
+            </div>
+        </div>
+
+        <!-- ======================================================
+             INDICADOR DE CARGA (LOADER)
+             Se muestra mientras el sistema consulta la API
+             y espera los resultados de la búsqueda.
+        ====================================================== -->
+        <div id="albumesLoader" style="display: none; text-align: center; padding: 2rem;">
+            
+            <!-- Animación de carga -->
+            <div class="loading-spinner"></div>
+
+            <!-- Mensaje informativo para el usuario -->
+            <p style="margin-top: 1rem;">Buscando álbumes...</p>
+        </div>
+
+        <!-- ======================================================
+             CONTENEDOR DE RESULTADOS
+             Aquí JavaScript insertará dinámicamente los álbumes
+             obtenidos desde la API externa.
+        ====================================================== -->
+        <div id="albumesResultado" class="albumes-grid">
+
+            <!-- Mensaje inicial que aparece antes de realizar una búsqueda -->
+            <!-- Sirve como guía para el usuario -->
+            <div class="welcome-message" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                
+                <!-- Ícono decorativo relacionado con guitarra -->
+                <i class="fas fa-guitar" style="font-size: 4rem; color: var(--primary-blue); margin-bottom: 1rem;"></i>
+                
+                <!-- Mensaje de bienvenida -->
+                <h3 style="color: var(--text-white); margin-bottom: 0.5rem;">¡Bienvenido al buscador de álbumes!</h3>
+                
+                <!-- Instrucciones básicas para usar el buscador -->
+                <p style="color: rgba(255,255,255,0.8);">Busca tu género favorito o usa los filtros rápidos</p>
+                
+                <!-- Ejemplos de búsqueda para ayudar al usuario -->
+                <p style="color: var(--stage-3-color); margin-top: 1rem;">
+                    Ejemplos: "guitarra acústica", "rock guitar", "flamenco", "jazz guitar"
+                </p>
+            </div>
+        </div>
+
+        <!-- ======================================================
+             SECCIÓN DE ESTADÍSTICAS
+             Muestra la cantidad de álbumes encontrados
+             y permite limpiar la búsqueda realizada.
+        ====================================================== -->
+        <div id="albumesStats" class="stats-container" style="margin-top: 2rem; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                
+                <!-- Muestra el número total de resultados -->
+                <h4 style="color: var(--text-white);">
+                    Resultados encontrados: <span id="resultCount">0</span>
+                </h4>
+
+                <!-- Botón que limpia la búsqueda y reinicia la sección -->
+                <button onclick="limpiarBusqueda()" class="btn-outline btn-sm">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
         <!-- Página de Panel de Administración -->
         <div id="admin-panel-page" class="page">
             <a href="#" class="back-btn" data-page="index"><i class="fas fa-arrow-left"></i> Volver al Inicio</a>
@@ -721,6 +858,8 @@
                     <div style="background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 1.5rem;">
                         <div style="height: 250px; position: relative;">
                             <canvas id="activityBarChart"></canvas>
+
+                            
                         </div>
                     </div>
                 </div>

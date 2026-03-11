@@ -4601,3 +4601,233 @@ window.diagnoseAdminButtons = diagnoseAdminButtons;
 window.loadAllUsers = loadAllUsers;
 window.refreshMessages = refreshMessages;
 window.closeChangeNameModal = closeChangeNameModal;
+
+// ======================================================
+// BUSCADOR DE ÁLBUMES DE GUITARRA CON LA API DE ITUNES
+// Este módulo permite buscar álbumes musicales relacionados
+// con guitarra usando la API pública de iTunes.
+// Los resultados se muestran dinámicamente en la página.
+// ======================================================
+
+
+// ------------------------------------------------------
+// Función principal del buscador
+// Se ejecuta cuando el usuario presiona el botón "Buscar"
+// ------------------------------------------------------
+async function buscarAlbumes() {
+
+    // Obtener el texto escrito por el usuario en el input
+    const query = document.getElementById('albumSearchInput').value.trim();
+
+    // Verificar que el campo no esté vacío
+    if (!query) {
+        showNotification('Por favor ingresa un término de búsqueda', 'error');
+        return;
+    }
+
+    // Enviar el término de búsqueda a la función que consulta la API
+    await buscarAlbumesPorQuery(query);
+}
+
+
+// ------------------------------------------------------
+// Buscar álbumes usando filtros rápidos de género
+// (por ejemplo: rock, jazz, flamenco, etc.)
+// ------------------------------------------------------
+async function buscarAlbumesPorGenero(genero) {
+
+    // Construir una búsqueda automática agregando "guitarra"
+    const query = `guitarra ${genero}`;
+
+    // Colocar el texto generado en el campo de búsqueda
+    document.getElementById('albumSearchInput').value = query;
+
+    // Realizar la búsqueda
+    await buscarAlbumesPorQuery(query);
+}
+
+
+// ------------------------------------------------------
+// Función que realiza la petición a la API de iTunes
+// Aquí se envía la consulta y se procesan los resultados
+// ------------------------------------------------------
+async function buscarAlbumesPorQuery(query) {
+
+    // Referencias a elementos del DOM donde se mostrarán datos
+    const resultado = document.getElementById('albumesResultado');
+    const loader = document.getElementById('albumesLoader');
+    const stats = document.getElementById('albumesStats');
+
+    // Mostrar animación de carga mientras se consulta la API
+    loader.style.display = 'block';
+
+    // Limpiar resultados anteriores
+    resultado.innerHTML = '';
+
+    // Ocultar estadísticas temporalmente
+    stats.style.display = 'none';
+
+    try {
+
+        // --------------------------------------------------
+        // Petición HTTP a la API de iTunes
+        // - term: término de búsqueda
+        // - media: tipo de contenido (music)
+        // - entity: tipo de resultado (album)
+        // - limit: máximo de resultados
+        // --------------------------------------------------
+        const response = await fetch(
+            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=album&limit=20`
+        );
+
+        // Convertir respuesta a formato JSON
+        const data = await response.json();
+
+        // Ocultar loader cuando llegan los datos
+        loader.style.display = 'none';
+
+        // Si la API no devuelve resultados
+        if (data.resultCount === 0) {
+
+            resultado.innerHTML = `
+                <div style="grid-column: 1/-1; text-align:center; padding:3rem;">
+                    <h3>No se encontraron álbumes</h3>
+                    <p>Prueba con: guitarra acústica, rock guitar o flamenco</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Mostrar número de resultados encontrados
+        stats.style.display = 'block';
+        document.getElementById('resultCount').textContent = data.resultCount;
+
+        // Enviar los álbumes a la función que los mostrará
+        mostrarAlbumes(data.results);
+
+    } catch (error) {
+
+        // Manejo de errores en caso de fallo en la conexión
+        console.error('Error:', error);
+
+        loader.style.display = 'none';
+
+        resultado.innerHTML = `
+            <div style="grid-column: 1/-1; text-align:center; padding:3rem;">
+                <h3>Error al buscar álbumes</h3>
+                <p>Intenta de nuevo más tarde</p>
+            </div>
+        `;
+    }
+}
+
+
+// ------------------------------------------------------
+// Función que genera las tarjetas HTML de los álbumes
+// Recibe los datos de la API y los muestra visualmente
+// ------------------------------------------------------
+function mostrarAlbumes(albumes) {
+
+    const container = document.getElementById('albumesResultado');
+
+    // Recorrer los resultados de la API y generar las tarjetas de cada álbum
+    container.innerHTML = albumes.map(album => `
+
+        <div class="album-card" onclick="verDetalleAlbum('${album.collectionId}')">
+
+            <!-- Imagen del álbum -->
+            <div class="album-image-container">
+                <img src="${album.artworkUrl100.replace('100x100', '600x600')}" 
+                     alt="${album.collectionName}"
+                     loading="lazy"
+                     onerror="this.src='https://via.placeholder.com/600x600?text=Sin+Imagen'">
+
+                <!-- Overlay visual al pasar el mouse -->
+                <div class="album-overlay">
+                    <i class="fas fa-play-circle"></i>
+                </div>
+            </div>
+
+            <!-- Información del álbum -->
+            <div class="album-info">
+
+                <h3 class="album-title">${album.collectionName}</h3>
+
+                <p class="album-artist">${album.artistName}</p>
+
+                <!-- Metadatos del álbum -->
+                <div class="album-meta">
+
+                    <!-- Año de lanzamiento -->
+                    <span class="album-year">
+                        ${new Date(album.releaseDate).getFullYear()}
+                    </span>
+
+                    <!-- Precio del álbum -->
+                    <span class="album-price">
+                        ${album.collectionPrice ? `$${album.collectionPrice}` : 'Gratis'}
+                    </span>
+
+                </div>
+
+                <!-- Género y número de canciones -->
+                <div class="album-genres">
+
+                    ${album.primaryGenreName ? `<span class="genre-tag">${album.primaryGenreName}</span>` : ''}
+
+                    ${album.trackCount ? `<span class="track-count">${album.trackCount} canciones</span>` : ''}
+
+                </div>
+
+                <!-- Botón para abrir el álbum en Apple Music -->
+                ${album.collectionViewUrl ? `
+                    <a href="${album.collectionViewUrl}" target="_blank" class="btn-outline btn-sm" onclick="event.stopPropagation()">
+                        Ver en Apple Music
+                    </a>
+                ` : ''}
+
+            </div>
+
+        </div>
+
+    `).join('');
+}
+
+
+// ------------------------------------------------------
+// Abre la página del álbum en Apple Music
+// usando el ID que devuelve la API
+// ------------------------------------------------------
+function verDetalleAlbum(albumId) {
+    window.open(`https://music.apple.com/us/album/${albumId}`, '_blank');
+}
+
+
+// ------------------------------------------------------
+// Restablece el buscador a su estado inicial
+// Limpia el input y los resultados
+// ------------------------------------------------------
+function limpiarBusqueda() {
+
+    document.getElementById('albumSearchInput').value = '';
+
+    document.getElementById('albumesResultado').innerHTML = `
+        <div class="welcome-message" style="text-align:center;padding:3rem;">
+            <h3>¡Busca tus álbumes favoritos!</h3>
+            <p>Usa el buscador o los filtros rápidos</p>
+        </div>
+    `;
+
+    document.getElementById('albumesStats').style.display = 'none';
+    document.getElementById('albumesLoader').style.display = 'none';
+}
+
+
+// ------------------------------------------------------
+// Hacer funciones accesibles desde el HTML
+// para poder usarlas con onclick
+// ------------------------------------------------------
+window.buscarAlbumes = buscarAlbumes;
+window.buscarAlbumesPorGenero = buscarAlbumesPorGenero;
+window.verDetalleAlbum = verDetalleAlbum;
+window.limpiarBusqueda = limpiarBusqueda;

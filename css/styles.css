@@ -1,7 +1,7 @@
 /* ========== VARIABLES DE COLOR BASADAS EN LA IMAGEN "APRENDE MÚSICA" ========== */
 :root {
     /* Paleta EXACTA basada en la imagen */
-    --background-dark: #0a1931;        /* Fondo azul marino oscuro (como la imagen) */
+  --background-dark: #0a1931;     /* Fondo azul marino oscuro (como la imagen) */
     --text-white: #ffffff;             /* Texto blanco */
     --primary-blue: #1a73e8;           /* Azul celeste para títulos y acentos */
     --secondary-blue: #4285f4;         /* Azul más claro para subtítulos */
@@ -2843,4 +2843,274 @@ footer {
 .pie-chart-canvas {
     height: 200px;
     position: relative;
+}
+
+/* ======================================================
+   ESTILOS PARA LA SECCIÓN DE ÁLBUMES DE GUITARRA
+   Define el diseño visual del buscador, tarjetas de álbumes
+   y la distribución de los resultados en la página.
+====================================================== */
+
+/* Contenedor principal de la sección de álbumes */
+.albumes-container {
+    max-width: 1200px; /* ancho máximo de la sección */
+    margin: 0 auto; /* centrar el contenedor */
+    padding: 1rem; /* espacio interno */
+}
+
+/* Grid que organiza las tarjetas de álbumes */
+.albumes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* columnas automáticas */
+    gap: 2rem; /* espacio entre tarjetas */
+    margin-top: 2rem;
+}
+
+/* Tarjeta individual de cada álbum */
+.album-card {
+    background: rgba(255, 255, 255, 0.08); /* fondo semitransparente */
+    border-radius: 16px; /* bordes redondeados */
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* animación suave */
+    cursor: pointer; /* cursor de clic */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: scaleIn 0.5s ease; /* animación al aparecer */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Efecto visual cuando el usuario pasa el mouse */
+.album-card:hover {
+    transform: translateY(-8px); /* levanta la tarjeta */
+    box-shadow: 0 20px 40px rgba(26, 115, 232, 0.3);
+    border-color: var(--primary-blue);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Contenedor de la imagen del álbum */
+.album-image-container {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* relación de aspecto 1:1 */
+    overflow: hidden;
+}
+
+/* Imagen del álbum */
+.album-image-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* ajusta la imagen sin deformarla */
+    transition: transform 0.5s ease;
+}
+
+/* Efecto zoom en la imagen al pasar el mouse */
+.album-card:hover .album-image-container img {
+    transform: scale(1.1);
+}
+
+/* Capa oscura sobre la imagen */
+.album-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0; /* oculto por defecto */
+    transition: opacity 0.3s ease;
+}
+
+/* Mostrar overlay al pasar el mouse */
+.album-card:hover .album-overlay {
+    opacity: 1;
+}
+
+/* Ícono que aparece sobre la imagen */
+.album-overlay i {
+    font-size: 3rem;
+    color: white;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    transform: scale(1);
+    transition: transform 0.3s ease;
+}
+
+/* Animación del ícono al hacer hover */
+.album-card:hover .album-overlay i {
+    transform: scale(1.2);
+}
+
+/* Información del álbum (título, artista, etc.) */
+.album-info {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Título del álbum */
+.album-title {
+    color: var(--text-white);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+
+    /* limitar texto a 2 líneas */
+   .album-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* para Chrome, Edge, Safari */
+    line-clamp: 2; /* propiedad estándar recomendada */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+    height: 3em;
+}
+
+/* Nombre del artista */
+.album-artist {
+    color: var(--primary-blue);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+
+    /* recortar texto si es muy largo */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Información adicional del álbum */
+.album-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+/* Año de lanzamiento */
+.album-year {
+    color: var(--stage-3-color);
+    font-weight: 600;
+}
+
+/* Precio del álbum */
+.album-price {
+    color: var(--stage-2-color);
+    font-weight: 600;
+}
+
+/* Contenedor de etiquetas del álbum */
+.album-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Etiqueta de género musical */
+.genre-tag {
+    background: rgba(26, 115, 232, 0.2);
+    color: var(--primary-blue);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid rgba(26, 115, 232, 0.3);
+}
+
+/* Etiqueta que muestra cantidad de canciones */
+.track-count {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ======================================================
+   ESTILOS DEL BUSCADOR
+====================================================== */
+
+/* Contenedor del buscador */
+.search-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Estilo del input de búsqueda */
+.search-section input {
+    font-size: 1rem;
+}
+
+/* Efecto cuando el usuario selecciona el input */
+.search-section input:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+}
+
+/* Botones pequeños utilizados en filtros */
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+/* ======================================================
+   MENSAJE DE BIENVENIDA
+====================================================== */
+
+/* Animación de aparición del mensaje */
+.welcome-message {
+    animation: fadeIn 0.6s ease;
+}
+
+/* Animación del ícono de guitarra */
+.welcome-message i {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* ======================================================
+   DISEÑO RESPONSIVE
+   Ajusta el diseño para tablets y celulares
+====================================================== */
+
+/* Tablets */
+@media (max-width: 768px) {
+    .albumes-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .search-section {
+        padding: 1.5rem;
+    }
+    
+    .search-section div:first-child {
+        flex-direction: column;
+    }
+    
+    .search-section button {
+        width: 100%;
+    }
+}
+
+/* Celulares */
+@media (max-width: 480px) {
+    .albumes-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .album-card {
+        max-width: 300px;
+        margin: 0 auto;
+    }
 }
