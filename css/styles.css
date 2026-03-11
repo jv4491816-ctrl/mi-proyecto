@@ -2954,6 +2954,11 @@ footer {
     flex-direction: column;
 }
 
+/* Empuja el botón siempre al fondo de la tarjeta */
+.album-info a {
+    margin-top: auto;
+}
+
 .album-title {
     color: var(--text-white);
     font-size: 1.1rem;
@@ -2964,7 +2969,7 @@ footer {
     /* limitar texto a 2 líneas */
     display: -webkit-box;
     -webkit-line-clamp: 2;
-     line-clamp: 2; /* propiedad estándar */
+    line-clamp: 2; /* propiedad estándar */
     -webkit-box-orient: vertical;
     overflow: hidden;
 
